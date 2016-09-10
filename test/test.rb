@@ -39,7 +39,8 @@ end
 class UidTest < StrategyTestCase
   def setup
     super
-    strategy.stubs(:identity).returns("user" => {"id" => "U123"}, "team" => {"id" => "T456"})
+    #strategy.stubs(:identity).returns("user" => {"id" => "U123"}, "team" => {"id" => "T456"})
+    strategy.stubs(:auth).returns("user" => {"id" => "U123"}, "team" => {"id" => "T456"})
   end
 
   test "returns the user ID from user_identity" do
@@ -55,6 +56,7 @@ class CredentialsTest < StrategyTestCase
     @access_token.stubs(:expires?)
     @access_token.stubs(:expires_at)
     @access_token.stubs(:refresh_token)
+    @access_token.stubs(:[])
     strategy.stubs(:access_token).returns(@access_token)
   end
 
@@ -104,7 +106,9 @@ class UserInfoTest < StrategyTestCase
   def setup
     super
     @access_token = stub("OAuth2::AccessToken")
+    @access_token.stubs(:[])
     strategy.stubs(:access_token).returns(@access_token)
+    strategy.stubs(:has_scope?).returns true
   end
 
   test "performs a GET to https://slack.com/api/users.identity" do
@@ -119,8 +123,9 @@ class SkipInfoTest < StrategyTestCase
 
   test 'info should not include extended info when skip_info is specified' do
     @options = { skip_info: true }
-    strategy.stubs(:identity).returns({})
-    assert_equal %w[name email image team_name], strategy.info.keys.map(&:to_s)
+    #strategy.stubs(:identity).returns({})
+    strategy.stubs(:auth).returns({})
+    assert_equal %w[name email user_id team_name team_id image], strategy.info.keys.map(&:to_s)
   end
 
 end
