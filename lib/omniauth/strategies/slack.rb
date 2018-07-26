@@ -50,7 +50,6 @@ module OmniAuth
     #   to use as few api requests as possible.
     #
     # * Allow setting of Slack subdomain at runtime.
-    #   See #subdomain definition below.
     #
     # * Allow option to preload the above mentioned api responses using
     #   any number of pooled threads.
@@ -69,7 +68,7 @@ module OmniAuth
     class Slack < OmniAuth::Strategies::OAuth2
       option :name, 'slack'
 
-      option :authorize_options, [:scope, :team]
+      option :authorize_options, [:scope, :team, :team_domain]
 
       option :client_options, {
         site: 'https://slack.com',
@@ -211,16 +210,33 @@ module OmniAuth
         }
       end
       
-      # Set team subdomain at runtime, if params['subdomain'] exists in omniauth authorization url.
-      # Allows sign-in of specified team (as the slack subdomain name) to be part of the oauth flow.
-      # Example: https://my.app.com/auth/slack?subdomain=myotherteam
-      # ... will redirect to https://myotherteam.slack.com/oauth/authorize...
+      # Sets team subdomain from :team_domain in the provider block,
+      # or at runtime from params['team_domain'] in the omniauth authorization url.
+      # In contrast to setting :team, setting :team_domain will force authentication
+      # against the specified team. However, if you are already logged in to that team,
+      # specifying the :team_domain will not let you skip the Slack OAUTH dialog,
+      # as happens when you specify :team.
+      #
+      # Using :team_domain, you get
+      #   https://myotherteam.slack.com/oauth/authorize&scope=...
+      #
+      # Using :team, you get 
+      #   https://slack.com/oauth/authorize?team=myotherteam&scope=...
+      # 
+      # Specify both :team and :team_domain to get the user through the OAUTH
+      # process as quickly as possible (assuming your user already has a token
+      # with the necessary scopes, and you know what team they are authenticating against).
+      #
+      # Note that this behavior is entirely controlled by Slack. The omniauth-slack gem
+      # only passes data to Slack and has no say in how the Slack OAUTH process works.
+      #
       def client
         super.tap do |c|
-          c.site = "https://#{request.params['subdomain']}.slack.com" if request.params['subdomain']
+          team_domain = request.params['team_domain'] || authorize_params[:team_domain]
+          c.site = "https://#{team_domain}.slack.com" if !team_domain.to_s.empty?
         end
       end
-
+      
       def authorize_params
         super.tap do |params|
           %w[scope team].each do |v|
