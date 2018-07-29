@@ -85,14 +85,14 @@ module OmniAuth
       # User ID is not guaranteed to be globally unique across all Slack users.
       # The combination of user ID and team ID, on the other hand, is guaranteed
       # to be globally unique.
-      uid { "#{auth['user_id'] || auth['user'].to_h['id']}-#{auth['team_id'] || auth['team'].to_h['id']}" }
+      uid { "#{auth['user_id'] || auth['user'].to_h['id'] || auth['authorizing_user'].to_h['user_id']}-#{auth['team_id'] || auth['team'].to_h['id']}" }
 
       info do
         
         # Experimental Thread Pool
         if options.preload_data_with_threads.to_i > 0
           work_q = Queue.new
-          %w(identity user_info user_profile team_info bot_info).each{|x| work_q.push x }
+          %w(apps_permissions_users_list identity user_info user_profile team_info bot_info).each{|x| work_q.push x }
           workers = (0...(options.preload_data_with_threads.to_i)).map do
             Thread.new do
               #puts "New thread #{Thread.current}"
@@ -113,7 +113,7 @@ module OmniAuth
         hash = { 
           name: auth['user'].to_h['name'],
           email: auth['user'].to_h['email'],
-          user_id: auth['user_id'] || auth['user'].to_h['id'],
+          user_id: auth['user_id'] || auth['user'].to_h['id'] || auth['authorizing_user'].to_h['user_id'],
           team_name: auth['team_name'] || auth['team'].to_h['name'],
           team_id: auth['team_id'] || auth['team'].to_h['id'],
           image: auth['team'].to_h['image_48']
@@ -191,13 +191,15 @@ module OmniAuth
           user_info: @user_info,
           user_profile: @user_profile,
           team_info: @team_info,
+          scopes_requested: env['omniauth.strategy']&.options&.scope,
           raw_info: {
             auth: access_token.dup.tap{|i| i.remove_instance_variable(:@client)},
             identity: @identity_raw,
             user_info: @user_info_raw,
             user_profile: @user_profile_raw,
             team_info: @team_info_raw,
-            bot_info: @bot_info_raw
+            bot_info: @bot_info_raw,
+            apps_permissions_users_list_raw: @apps_permissions_users_list_raw
           }
         }
       end
@@ -205,7 +207,7 @@ module OmniAuth
       credentials do
         {
           token: access_token.token,
-          scope: access_token['scope'],
+          scope: (is_app_token ? all_scopes : auth['scope']),
           expires: false
         }
       end
@@ -240,7 +242,7 @@ module OmniAuth
       def authorize_params
         super.tap do |params|
           %w[scope team].each do |v|
-            if request.params[v]
+            if !request.params[v].to_s.empty?
               params[v.to_sym] = request.params[v]
             end
           end
@@ -248,12 +250,15 @@ module OmniAuth
       end
       
       def auth
-        access_token.params.to_h.merge({token: access_token.token})
+        @auth ||= access_token.params.to_h.merge({token: access_token.token})
       end
 
       def identity
-        return {} unless has_scope?('identity.basic')
-        @identity_raw ||= access_token.get('/api/users.identity')
+        return {} unless has_scope?('identity.basic') || has_scope?('identity:read:user')
+        @identity_raw ||= (
+          opts = {headers: {'X-Slack-User' => auth['user_id'] || auth['user']&.dig('id') || auth['authorizing_user']&.dig('user_id')}}
+          access_token.get( *['/api/users.identity', (is_app_token ? opts : nil)].compact )
+        )
         @identity ||= @identity_raw.parsed
       end
 
@@ -301,6 +306,30 @@ module OmniAuth
         @bot_info_raw ||= access_token.get('/api/bots.info')
         @bot_info ||= @bot_info_raw.parsed
       end
+      
+      
+      def apps_permissions_users_list
+        #return {} unless auth['token'].to_s[/^xoxa/]
+        return {} unless is_app_token
+        @apps_permissions_users_list_raw ||= access_token.get('/api/apps.permissions.users.list')
+        @apps_permissions_users_list ||= @apps_permissions_users_list_raw.parsed
+      end
+      
+      def has_scope?(scope)
+        #access_token['scope'].to_s.split(',').include?(scope.to_s)
+        #credentials&.dig(:scope).to_s.split(',').include?(scope.to_s)
+        all_scopes.each{|key,val| val.include?(scope.to_s)}
+      end
+      
+      def is_app_token
+        auth['token_type'].to_s == 'app'
+      end
+      
+      def all_scopes
+        @all_scopes ||=
+        {'identity': auth['scope'] || apps_permissions_users_list&.dig('resources').to_a[0]&.dig('scopes').join(',')}
+        .merge(access_token['scopes'].to_h)
+      end
 
 
       private
@@ -309,10 +338,7 @@ module OmniAuth
         full_host + script_name + callback_path
       end
       
-      def has_scope?(scope)
-        access_token['scope'].to_s.split(',').include?(scope.to_s)
-      end
-      
     end
   end
 end
+
