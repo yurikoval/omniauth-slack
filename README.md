@@ -1,9 +1,15 @@
+⚠   **_WARNING_**: You are viewing the README of the ginjo fork of omniauth-slack.
+
+To view the original omniauth-slack from [@kmrshntr](https://github.com/kmrshntr), go [here](https://github.com/kmrshntr/omniauth-slack).
+
 # Omniauth::Slack
 
-This Gem contains the Slack strategy for OmniAuth and supports the
-[Sign in with Slack](https://api.slack.com/docs/sign-in-with-slack) approval flow.
+This Gem contains the Slack strategy for OmniAuth and supports (almost) all features of
+the [Slack OAuth2 API](https://api.slack.com/docs/oauth), including both
+[Sign in with Slack](https://api.slack.com/docs/sign-in-with-slack) and
+[Add to Slack](https://api.slack.com/docs/slack-button) approval flows.
 
-[![Gem Version](https://badge.fury.io/rb/omniauth-slack.svg)](http://badge.fury.io/rb/omniauth-slack)
+This Gem supports "classic" apps and tokens as well as "new" Workspace apps and tokens.
 
 
 ## Before You Begin
@@ -15,27 +21,38 @@ Now sign into the [Slack application dashboard](https://api.slack.com/applicatio
 
 ## Using This Strategy
 
-First start by adding this gem to your Gemfile:
+First start by adding this gem to your Gemfile (This will install the latest HEAD version from the ginjo repository):
 
 ```ruby
-gem 'omniauth-slack'
-```
-
-If you need to use the latest HEAD version, you can do so with:
-
-```ruby
-gem 'omniauth-slack', github: 'kmrshntr/omniauth-slack'
+gem 'omniauth-slack', git: 'https://github.com/ginjo/omniauth-slack'
 ```
 
 Next, tell OmniAuth about this provider. For a Rails app, your `config/initializers/omniauth.rb` file should look like this:
 
 ```ruby
 Rails.application.config.middleware.use OmniAuth::Builder do
-  provider :slack, 'API_KEY', 'API_SECRET', scope: 'identity.basic'
+  provider :slack, 'API_KEY', 'API_SECRET', scope: 'string-of-scopes'
 end
 ```
 
 Replace `'API_KEY'` and `'API_SECRET'` with the appropriate values you obtained [earlier](https://api.slack.com/applications).
+Replace `'string-of-scopes'` with a comma (or space) separated string of Slack API scopes.
+
+
+For a basic [Sinatra](http://sinatrarb.com/) app:
+
+```ruby
+require 'sinatra'
+require 'omniauth-slack'
+
+use OmniAuth::Builder do |env|
+  provider :slack,
+    ENV['SLACK_OAUTH_KEY_WS'],
+    ENV['SLACK_OAUTH_SECRET_WS'],
+    scope: 'string-of-scopes'
+end
+```
+
 
 If you are using [Devise](https://github.com/plataformatec/devise) then it will look like this:
 
@@ -43,7 +60,7 @@ If you are using [Devise](https://github.com/plataformatec/devise) then it will 
 Devise.setup do |config|
   # other stuff...
 
-  config.omniauth :slack, ENV['SLACK_APP_ID'], ENV['SLACK_APP_SECRET'], scope: 'identity.basic'
+  config.omniauth :slack, ENV['SLACK_APP_ID'], ENV['SLACK_APP_SECRET'], scope: 'string-of-scopes'
 
   # other stuff...
 end
@@ -51,7 +68,7 @@ end
 
 
 ## Scopes
-Slack lets you choose from a [few different scopes](https://api.slack.com/docs/oauth-scopes#scopes).
+Slack lets you choose from a [few different scopes](https://api.slack.com/docs/oauth-scopes#scopes). *Here is another [list of Slack scopes](https://api.slack.com/scopes) with classic and new app compatibility information.*
 
 However, you cannot request both `identity` scopes and other scopes at the same time.
 
@@ -66,109 +83,18 @@ provider :slack, 'API_KEY', 'API_SECRET', scope: 'team:read,users:read,identify,
 Use the first provider to sign users in and the second to add the application to their team.
 
 
-## Auth Hash Example
-
-For the scope `team:read,users:read,identify` the resulting auth hash would look like this:
-
-```ruby
-{
-  provider: "slack",
-  uid: "U3BPA937E",
-  info: {
-    description: "Welcome to Slack",
-    email: "email@example.com",
-    first_name: "Matt",
-    image: "https://secure.gravatar.com/avatar/69720796ae3e1c2d63cd66b2d53571a5.jpg?s=192&d=https%3A%2F%2Fa.slack-edge.com%2F7fa9%2Fimg%2Favatars%2Fava_0013-192.png",
-    image_24: "https://secure.gravatar.com/avatar/69720796ae3e1c2d63cd66b2d53571a5.jpg?s=192&d=https%3A%2F%2Fa.slack-edge.com%2F7fa9%2Fimg%2Favatars%2Fava_0013-24.png",
-    image_48: "https://secure.gravatar.com/avatar/69720796ae3e1c2d63cd66b2d53571a5.jpg?s=192&d=https%3A%2F%2Fa.slack-edge.com%2F7fa9%2Fimg%2Favatars%2Fava_0013-48.png",
-    is_admin: true,
-    is_owner: true,
-    last_name: "Holmes",
-    name: "Matt Holmes",
-    nickname: "matty",
-    team: "Mattison co.",
-    team_id: "A3V3VC35Y",
-    time_zone: "Europe/Amsterdam",
-    user: "matty",
-    user_id: "U3BPA937E"
-  },
-  credentials {
-    expires: false,
-    token: "xoxp-127131411201-127810174082-127813170226-f205827fb956488602bef2068471d7a5",
-  },
-  extra {
-    bot_info: {},
-    raw_info: {
-      ok: true,
-      team: "Mattison co.",
-      team_id: "A3V3VC35Y",
-      url: "https://mattison.slack.com/",
-      user: "matty",
-      user_id: "U3BPA937E"
-    },
-    team_info: {
-      ok: true,
-      team: {
-        domain: "mattison",
-        email_domain: "",
-        icon: {
-          image_102: "https://a.slack-edge.com/66f9/img/avatars-teams/ava_0018-102.png",
-          image_132 "https://a.slack-edge.com/66f9/img/avatars-teams/ava_0018-132ng",
-          image_230"https://a.slack-edge.com/66f9/img/avatars-teams/ava_0018-230ng",
-          image_34 "https://a.slack-edge.com/66f9/img/avatars-teams/ava_0018-34png",
-          image_44 "https://a.slack-edge.com/66f9/img/avatars-teams/ava_0018-44png",
-          image_68 "https://a.slack-edge.com/66f9/img/avatars-teams/ava_0018-68png",
-          image_88 "https://a.slack-edge.com/66f9/img/avatars-teams/ava_0018-88png",
-          image_default: true
-        },
-        id: "A3V3VC35Y",
-        name: "Mattison co."
-      }
-    },
-    user_info: {
-      ok: true,
-      user: {
-        color: "9f69e7",
-        deleted: false,
-        has_2fa: false,
-        id: "U3BPA937E",
-        is_admin: true,
-        is_bot: false,
-        is_owner: true,
-        is_primary_owner: true,
-        is_restricted: false,
-        is_ultra_restricted: false,
-        name: "matty",
-        profile: {
-          avatar_hash: "g69720796ae3",
-          first_name: "Matt",
-          image_192: "https://secure.gravatar.com/avatar/69720796ae3e1c2d63cd66b2d53571a5.jpg?s=192&d=https%3A%2F%2Fa.slack-edge.com%2F7fa9%2Fimg%2Favatars%2Fava_0013-192.png",
-          image_24: "https://secure.gravatar.com/avatar/69720796ae3e1c2d63cd66b2d53571a5.jpg?s=192&d=https%3A%2F%2Fa.slack-edge.com%2F7fa9%2Fimg%2Favatars%2Fava_0013-24.png",
-          image_32: "https://secure.gravatar.com/avatar/69720796ae3e1c2d63cd66b2d53571a5.jpg?s=192&d=https%3A%2F%2Fa.slack-edge.com%2F7fa9%2Fimg%2Favatars%2Fava_0013-32.png",
-          image_48: "https://secure.gravatar.com/avatar/69720796ae3e1c2d63cd66b2d53571a5.jpg?s=192&d=https%3A%2F%2Fa.slack-edge.com%2F7fa9%2Fimg%2Favatars%2Fava_0013-48.png",
-          image_512: "https://secure.gravatar.com/avatar/69720796ae3e1c2d63cd66b2d53571a5.jpg?s=192&d=https%3A%2F%2Fa.slack-edge.com%2F7fa9%2Fimg%2Favatars%2Fava_0013-512.png",
-          image_72: "https://secure.gravatar.com/avatar/69720796ae3e1c2d63cd66b2d53571a5.jpg?s=192&d=https%3A%2F%2Fa.slack-edge.com%2F7fa9%2Fimg%2Favatars%2Fava_0013-72.png",
-          last_name: "Holmes",
-          real_name: "Matt Holmes",
-          real_name_normalized: "Matt Holmes"
-        },
-        real_name: "Matt Holmes",
-        status: nil,
-        team_id: "A3V3VC35Y",
-        tz: "Europe/Amsterdam",
-        tz_label: "Central European Time",
-        tz_offset: 3600
-      }
-    },
-    web_hook_info: {}
-  }
-}
-```
-
-
 ## Authentication Options
 
+Authentication options are specified in the provider block, as show above. Some of these options can also be given at runtime in the authorization request url.
+
+```scope```, ```team```, and ```team_domain``` can be given at runtime. ```scope``` and ```team``` will be passed directly through to Slack in the OAuth GET request ```https://slack.com/oauth/authorize?scope=identity.basic,identity.email&team=team-id```.
+
+```team_domain``` will be inserted into the GET request as a subdomain ```https://team-domain.slack.com/oauth/authorize```
+
+More information on provider and authentication options can be found in omniauth-slack's supporting gems [omniauth](https://github.com/omniauth/omniauth), [oauth2](https://github.com/oauth-xx/oauth2), and [omniauth-oauth2](https://github.com/omniauth/omniauth-oauth2).
+
 ### Team
+```:team```, ```:team_domain```
 
 > If you don't pass a team param, the user will be allowed to choose which team they are authenticating against. Passing this param ensures the user will auth against an account on that particular team.
 
@@ -180,6 +106,51 @@ Rails.application.config.middleware.use OmniAuth::Builder do
 end
 ```
 
+Note that if your user is not already signed-in to the Slack team that you specify, they will be asked to provide the team domain first.
+
+Another (possibly undocumented) way to specify team is by passing in the `:team_domain` parameter. In contrast to setting `:team`, setting `:team_domain` will force authentication against the specified team (credentials permitting of course), even if the user is not logged in to that team. However, if you are already logged in to that team, specifying the `:team_domain` alone will not let you skip the Slack OAUTH dialog, as is possible when you specify `:team`.
+
+Sign-in behavior with team settings and signed-in state can be confusing. Here is a breakdown based on Slack documentation and observations while building and testing this gem:
+
+| Setting and state | Will authenticate against specific team | Will skip authorization approval if previously approved |
+| --- | :---: | :---: |
+| using `:team`, already signed in | :heavy_check_mark: | :heavy_check_mark: |
+| using `:team`, not signed in |   | :heavy_check_mark: |
+| using `:team_domain`, already signed in | :heavy_check_mark: |   |
+| using `:team_domain`, not signed in | :heavy_check_mark: |   |
+| using `:team` and `:team_domain`, already signed in | :heavy_check_mark: | :heavy_check_mark: |
+| using `:team` and `:team_domain`, not signed in |   | :heavy_check_mark: |
+
+### Scope
+```:scope```
+  
+### Callback Path
+```:callback_path```
+
+### Preload Data with Multiple Threads
+```:preload_data_with_multiple_threads```
+
+
+## Workspace Apps and Tokens
+This gem provides support for Slack's developer preview of [Workspace apps](https://api.slack.com/workspace-apps-preview). There are some important differences between Slack's classic apps and the new Workspace apps. The main points to be aware of when using omniauth-slack with Workspace Apps are:
+
+* Workspace app tokens are issued as a single token per team. There are no user or bot tokens. All Workspace app API calls are made with the Workspace token. Calls that act on behalf of a user or bot are also made with the same token.
+
+* The available api calls and the scopes required to access them are different in Workspace apps. See Slack's docs on [Scopes](https://api.slack.com/scopes) and [Methods](https://api.slack.com/methods/workspace-tokens) for more details.
+
+* The OmniAuth::AuthHash.credentials.scope object, returned from a successful authentication, is a hash with each value containing an array of scopes. See below for an example.
+
+
+## Auth Hash
+
+The AuthHash from this gem has the standard components of an ```OmniAuth::AuthHash``` object, with some additional data added to the ```:info``` and ```extra``` sections.
+
+If the scopes allow, additional api calls will be made to gather additional user and team info, unless the ```:skip_info``` option set.
+
+The ```:extra``` section contains the parsed data from each of the api calls made during the authorization. The ```:extra``` section also contains a ```:raw_info``` hash, which in turn contains the raw response object from each of the api calls.
+
+See [this gist for an example AuthHash](https://gist.github.com/ginjo/3105cf4e975996c9032bb4725f949cd2) from a workspace token with a mix of identity scopes and regular app scopes applied.
+
 
 ## Contributing
 
@@ -188,5 +159,3 @@ end
 3. Commit your changes (`git commit -am 'Add some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)
 5. Create new Pull Request
-
-[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/kmrshntr/omniauth-slack/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
