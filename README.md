@@ -9,7 +9,7 @@ the [Slack OAuth2 authorization API](https://api.slack.com/docs/oauth), includin
 [Sign in with Slack](https://api.slack.com/docs/sign-in-with-slack) and
 [Add to Slack](https://api.slack.com/docs/slack-button) approval flows.
 
-This Gem supports "classic" apps and tokens as well as "new" Workspace apps and tokens.
+This Gem supports Slack "classic" apps and tokens as well as "new" Workspace apps and tokens.
 
 
 ## Before You Begin
@@ -91,7 +91,7 @@ Removal of scope(s) requires revocation of the token.
 
 ## Authentication Options
 
-Authentication options are specified in the provider block, as show above, and all are optional except for `:scope`.
+Authentication options are specified in the provider block, as shown above, and all are optional except for `:scope`.
 You will need to specify at least one scope to get a successful authentication and authorization.
 
 Some of these options can also be given at runtime in the authorization request url.
@@ -142,7 +142,7 @@ However, if you are already logged in to that team, specifying the `:team_domain
 
 Sign-in behavior with team settings and signed-in state can be confusing. Here is a breakdown based on Slack documentation and observations while building and testing this gem:
 
-| Setting and state | Will authenticate against specific team | Will skip authorization approval if previously approved |
+| Setting and state | Will authenticate against specific team | Will skip authorization approval if scopes previously approved |
 | --- | :---: | :---: |
 | using `:team`, already signed in | :heavy_check_mark: | :heavy_check_mark: |
 | using `:team`, not signed in |   | :heavy_check_mark: |
@@ -174,7 +174,7 @@ Omniauth, however, considers email to be a required field. So adhearing to omnia
 This version of omniauth-slack respects the skip_info feature. If set, only a single api request will be made for each authorization. The response of this request may or may not contain email data.
 
 
-### Preload Data with Multiple Threads (optional)
+### Preload Data with Threads (optional)
 
 ```ruby
 :preload_data_with_threads => 0
@@ -194,7 +194,7 @@ The caveat is an increase in request load on Slack, possibly affecting rate-limi
 ## Workspace Apps and Tokens
 This gem provides support for Slack's developer preview of [Workspace apps](https://api.slack.com/workspace-apps-preview). There are some important differences between Slack's classic apps and the new Workspace apps. The main points to be aware of when using omniauth-slack with Workspace Apps are:
 
-* Workspace app tokens are issued as a single token per team. There are no user or bot tokens. All Workspace app API calls are made with the Workspace token. Calls that act on behalf of a user or bot are also made with the same token.
+* Workspace app tokens are issued as a single token per team. There are no user or bot tokens. All Workspace app API calls are made with the Workspace token. Calls that act on behalf of a user or bot are made with the same token.
 
 * The available api calls and the scopes required to access them are different in Workspace apps. See Slack's docs on [Scopes](https://api.slack.com/scopes) and [Methods](https://api.slack.com/methods/workspace-tokens) for more details.
 
@@ -206,7 +206,6 @@ This gem provides support for Slack's developer preview of [Workspace apps](http
 The AuthHash from this gem has the standard components of an `OmniAuth::AuthHash` object, with some additional data added to the `:info` and `:extra` sections.
 
 If the scopes allow, additional api calls *may* be made to gather additional user and team info, unless the `:skip_info` option is set.
-If `:preload_
 
 The `:extra` section contains the parsed data from each of the api calls made during the authorization.
 Also included is a `:raw_info` hash, which in turn contains the raw response object from each of the api calls.
