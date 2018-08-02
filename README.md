@@ -82,19 +82,30 @@ provider :slack, 'API_KEY', 'API_SECRET', scope: 'team:read,users:read,identify,
 
 Use the first provider to sign users in and the second to add the application to their team.
 
+Slack is designed to allow quick authorization of users with minimally scoped requests. Deeper scope authorizations are intended to be aquired with further passes thru Slack's authorization process, as the needs of the user and the endpoint app require.
+
+This works because Slack scopes are additive: Once you successfully authorize a scope, the token will possess that scope forever, regardless of what flow or scopes are requested at future authorizations.
+
+Removal of scope(s) requires revocation of the token.
+
 
 ## Authentication Options
 
 Authentication options are specified in the provider block, as show above. Some of these options can also be given at runtime in the authorization request url.
 
-```scope```, ```team```, and ```team_domain``` can be given at runtime. ```scope``` and ```team``` will be passed directly through to Slack in the OAuth GET request ```https://slack.com/oauth/authorize?scope=identity.basic,identity.email&team=team-id```.
+`scope`, `team`, and `team_domain` can be given at runtime. `scope` and `team` will be passed directly through to Slack in the OAuth GET request `https://slack.com/oauth/authorize?scope=identity.basic,identity.email&team=team-id`.
 
-```team_domain``` will be inserted into the GET request as a subdomain ```https://team-domain.slack.com/oauth/authorize```
+`team_domain` will be inserted into the GET request as a subdomain `https://team-domain.slack.com/oauth/authorize`
 
 More information on provider and authentication options can be found in omniauth-slack's supporting gems [omniauth](https://github.com/omniauth/omniauth), [oauth2](https://github.com/oauth-xx/oauth2), and [omniauth-oauth2](https://github.com/omniauth/omniauth-oauth2).
 
 ### Team
-```:team```, ```:team_domain```
+
+```ruby
+:team => 'team-id'
+  # and/or
+:team_domain => 'team-subdomain'
+```
 
 > If you don't pass a team param, the user will be allowed to choose which team they are authenticating against. Passing this param ensures the user will auth against an account on that particular team.
 
@@ -122,13 +133,52 @@ Sign-in behavior with team settings and signed-in state can be confusing. Here i
 | using `:team` and `:team_domain`, not signed in |   | :heavy_check_mark: |
 
 ### Scope
-```:scope```
+
+```ruby
+:scope => 'string-of-comma-or-space-separated-scopes'
+```
+
+Specify the scopes you would like to add to the token during this authorization request.
+
   
 ### Callback Path
-```:callback_path```
+
+```ruby
+:callback_path => '/auth/slack/callback'
+```
+
+The callback path in your app, where Slack will redirect to with an authorization code. Your app should trade the code for a token with the `oauth.access` API call.
+
+
+### Skip Info
+
+```ruby
+:skip_info => false
+```
+
+Slack does not consider email to be an essential field, and therefore does not guarantee inclusion of email data in either the signin-with-slack or the add-to-slack flow.
+
+Omniauth, however, considers email to be a required field. So adhearing to omniauth's spec means either forcing certain Slack scopes or always making multiple api requests for each authorization, which breaks (or renders useless) omniauth's skip_info feature.
+
+This version of omniauth-slack respects the skip_info feature. If set, only a single api request will be made for each authorization. The response of this request may or may not contain email data.
+
 
 ### Preload Data with Multiple Threads
-```:preload_data_with_multiple_threads```
+
+```ruby
+:preload_data_with_multiple_threads => false
+```
+
+Preload the basic identity and info API-call responses using any number of pooled threads.
+
+```ruby
+provider :slack, key, secret, :preload_data_with_threads => 3
+```
+
+The default (0) skips this feature and only loads those API calls if required while building the AuthHash.
+Any integer > 0 will cause the authorization to use that number of threads to preload the handful of API-call responses required to completely fill out the AuthHash (as permitted by the token's scopes).
+
+More threads can give a quicker authorization callback but may affect Slack's rate-limiting on your app.
 
 
 ## Workspace Apps and Tokens
@@ -143,14 +193,17 @@ This gem provides support for Slack's developer preview of [Workspace apps](http
 
 ## Auth Hash
 
-The AuthHash from this gem has the standard components of an ```OmniAuth::AuthHash``` object, with some additional data added to the ```:info``` and ```extra``` sections.
+The AuthHash from this gem has the standard components of an `OmniAuth::AuthHash` object, with some additional data added to the `:info` and `:extra` sections.
 
-If the scopes allow, additional api calls will be made to gather additional user and team info, unless the ```:skip_info``` option set.
+If the scopes allow, additional api calls will be made to gather additional user and team info, unless the `:skip_info` option is set. An attempt is made to use as few api requests as possible to get the data necessary to fill out a minimum AuthHash.
 
-The ```:extra``` section contains the parsed data from each of the api calls made during the authorization. The ```:extra``` section also contains a ```:raw_info``` hash, which in turn contains the raw response object from each of the api calls.
+The `:extra` section contains the parsed data from each of the api calls made during the authorization. Also included is a `:raw_info` hash, which in turn contains the raw response object from each of the api calls.
+
+The `:extra` section also contains `:scopes_requested`, which are the scopes requested during the current authorization.
 
 See [this gist for an example AuthHash](https://gist.github.com/ginjo/3105cf4e975996c9032bb4725f949cd2) from a workspace token with a mix of identity scopes and regular app scopes applied.
 
+See <https://github.com/omniauth/omniauth/wiki/Auth-Hash-Schema> for more info on the auth_hash schema.
 
 ## Contributing
 
