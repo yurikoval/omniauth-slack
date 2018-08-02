@@ -160,7 +160,7 @@ module OmniAuth
       
       private
       
-      # Preload additional api calls with limited thread pool.
+      # Preload additional api calls with a pool of threads.
       def preload_data_with_threads(num_threads=options.preload_data_with_threads.to_i)
         log :debug, "Calling preload_data_with_threads(#{num_threads})."
         work_q = Queue.new

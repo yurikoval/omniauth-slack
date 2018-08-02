@@ -5,7 +5,7 @@ To view the original omniauth-slack from [@kmrshntr](https://github.com/kmrshntr
 # Omniauth::Slack
 
 This Gem contains the Slack strategy for OmniAuth and supports (almost) all features of
-the [Slack OAuth2 API](https://api.slack.com/docs/oauth), including both
+the [Slack OAuth2 authorization API](https://api.slack.com/docs/oauth), including both
 [Sign in with Slack](https://api.slack.com/docs/sign-in-with-slack) and
 [Add to Slack](https://api.slack.com/docs/slack-button) approval flows.
 
@@ -177,19 +177,18 @@ This version of omniauth-slack respects the skip_info feature. If set, only a si
 ### Preload Data with Multiple Threads (optional)
 
 ```ruby
-:preload_data_with_multiple_threads => 0
+:preload_data_with_threads => 0
 ```
 
-If given an integer > 0, omniauth-slack preloads the basic identity and info API-call responses using the given number of pooled threads.
+If given an integer > 0, omniauth-slack preloads the basic identity and info API-call responses, using the given number of pooled threads.
+The default (0) skips this feature and only loads those API calls if required (and authorized) to build the AuthHash.
 
 ```ruby
 provider :slack, key, secret, :preload_data_with_threads => 3
 ```
 
-The default (0) skips this feature and only loads those API calls if required while building the AuthHash.
-Any integer > 0 will cause the authorization to use that number of threads to preload the handful of API-call responses required to completely fill out the AuthHash (as permitted by the token's scopes).
-
-More threads can give a quicker authorization callback but may affect Slack's rate-limiting on your app.
+More threads can potentially give a quicker callback phase.
+The caveat is an increase in request load on Slack, possibly affecting rate-limiting.
 
 
 ## Workspace Apps and Tokens
@@ -206,9 +205,11 @@ This gem provides support for Slack's developer preview of [Workspace apps](http
 
 The AuthHash from this gem has the standard components of an `OmniAuth::AuthHash` object, with some additional data added to the `:info` and `:extra` sections.
 
-If the scopes allow, additional api calls will be made to gather additional user and team info, unless the `:skip_info` option is set. An attempt is made to use as few api requests as possible to get the data necessary to fill out a minimum AuthHash.
+If the scopes allow, additional api calls *may* be made to gather additional user and team info, unless the `:skip_info` option is set.
+If `:preload_
 
-The `:extra` section contains the parsed data from each of the api calls made during the authorization. Also included is a `:raw_info` hash, which in turn contains the raw response object from each of the api calls.
+The `:extra` section contains the parsed data from each of the api calls made during the authorization.
+Also included is a `:raw_info` hash, which in turn contains the raw response object from each of the api calls.
 
 The `:extra` section also contains `:scopes_requested`, which are the scopes requested during the current authorization.
 
