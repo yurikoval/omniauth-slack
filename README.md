@@ -80,7 +80,7 @@ provider :slack, 'API_KEY', 'API_SECRET', scope: 'identity.basic', name: :sign_i
 provider :slack, 'API_KEY', 'API_SECRET', scope: 'team:read,users:read,identify,bot'
 ```
 
-Use the first provider to sign users in and the second to add the application to their team.
+Use the first provider to sign users in and the second to add the application (and deeper capabilities) to their team.
 
 Slack is designed to allow quick authorization of users with minimally scoped requests. Deeper scope authorizations are intended to be acquired with further passes thru Slack's authorization process, as the needs of the user and the endpoint app require.
 
@@ -102,7 +102,7 @@ Some of these options can also be given at runtime in the authorization request 
 https://slack.com/oauth/authorize?scope=identity.basic,identity.email&team=team-id
 ```
 
-`team_domain` will be inserted into the GET request as a subdomain `https://team-domain.slack.com/oauth/authorize`
+`team_domain` will be inserted into the GET request as a subdomain `https://team-domain.slack.com/oauth/authorize`.
 
 More information on provider and authentication options can be found in omniauth-slack's supporting gems [omniauth](https://github.com/omniauth/omniauth), [oauth2](https://github.com/oauth-xx/oauth2), and [omniauth-oauth2](https://github.com/omniauth/omniauth-oauth2).
 
@@ -134,15 +134,18 @@ Rails.application.config.middleware.use OmniAuth::Builder do
 end
 ```
 
-Note that if your user is not already signed-in to the Slack team that you specify, they will be asked to provide the team domain first.
+If your user is not already signed in to the Slack team that you specify, they will be asked to provide the team domain first.
 
 Another (possibly undocumented) way to specify team is by passing in the `:team_domain` parameter.
-In contrast to setting `:team`, setting `:team_domain` will force authentication against the specified team (credentials permitting of course), even if the user is not logged in to that team.
-However, if you are already logged in to that team, specifying the `:team_domain` alone will not let you skip the Slack authorization dialog, as is possible when you specify `:team`.
+In contrast to setting `:team`, setting `:team_domain` will force authentication against the specified team (credentials permitting of course), even if the user is not signed in to that team.
+However, if you are already signed in to that team, specifying the `:team_domain` alone will not let you skip the Slack authorization dialog, as is possible when you specify `:team`.
 
-Sign-in behavior with team settings and signed-in state can be confusing. Here is a breakdown based on Slack documentation and observations while building and testing this gem:
+Sign in behavior with team settings and signed in state can be confusing. Here is a breakdown based on Slack documentation and observations while building and testing this gem:
 
-| Setting and state | Will authenticate against specific team | Will skip authorization approval if scopes previously approved |
+
+#### Team settings and sign in state vs Slack OAuth behavior. 
+
+| Setting and state | Will authenticate against specific team | Will skip authorization approval<br>-<br>*The elusive unobtrusive<br>[Sign in with Slack](https://api.slack.com/docs/sign-in-with-slack)* |
 | --- | :---: | :---: |
 | using `:team`, already signed in | :heavy_check_mark: | :heavy_check_mark: |
 | using `:team`, not signed in |   | :heavy_check_mark: |
@@ -150,6 +153,14 @@ Sign-in behavior with team settings and signed-in state can be confusing. Here i
 | using `:team_domain`, not signed in | :heavy_check_mark: |   |
 | using `:team` and `:team_domain`, already signed in | :heavy_check_mark: | :heavy_check_mark: |
 | using `:team` and `:team_domain`, not signed in |   | :heavy_check_mark: |
+| using no team parameters |   |   |
+
+*Slack's authorization process will only skip the authorization approval step, if in addition to the above settings and state, ALL of the following conditions are met:*
+
+* Token has at least one identity scope previously approved.
+* Current authorization is requesting at least one identity scope.
+* Current authorization is not requesting any scopes that the token does not already have.
+* Current authorization is not requesting any non-identity scopes (but it's ok if the token already has non-identity scopes).
 
 
 ### Callback Path (optional)

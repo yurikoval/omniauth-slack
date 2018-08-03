@@ -259,7 +259,7 @@ module OmniAuth
       # Lists of scopes are in array form.
       def all_scopes
         @all_scopes ||=
-        {'identity' => (auth['scope'] || apps_permissions_users_list[user_id].to_h['scopes'].join(',')).to_s.split(',')}
+        {'identity' => (auth['scope'] || apps_permissions_users_list[user_id].to_h['scopes'].to_a.join(',')).to_s.split(',')}
         .merge(auth['scopes'].to_h)
       end
       
