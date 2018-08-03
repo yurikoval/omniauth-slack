@@ -96,10 +96,10 @@ You will need to specify at least one scope to get a successful authentication a
 
 Some of these options can also be given at runtime in the authorization request url.
 
-`scope`, `team`, and `team_domain` can be given at runtime. `scope` and `team` will be passed directly through to Slack in the OAuth GET request.
+`scope`, `team`, `team_domain`, and `redirect_uri` can be given at runtime. `scope`, `team`, and `redirect_uri` will be passed directly through to Slack in the OAuth GET request.
 
 ```ruby
-https://slack.com/oauth/authorize?scope=identity.basic,identity.email&team=team-id
+https://slack.com/oauth/authorize?scope=identity.basic,identity.email&team=team-id&redirect_uri=https://different.subdomain/different/callback/path
 ```
 
 `team_domain` will be inserted into the GET request as a subdomain `https://team-domain.slack.com/oauth/authorize`.
@@ -140,7 +140,7 @@ Another (possibly undocumented) way to specify team is by passing in the `:team_
 In contrast to setting `:team`, setting `:team_domain` will force authentication against the specified team (credentials permitting of course), even if the user is not signed in to that team.
 However, if you are already signed in to that team, specifying the `:team_domain` alone will not let you skip the Slack authorization dialog, as is possible when you specify `:team`.
 
-Sign in behavior with team settings and signed in state can be confusing. Here is a breakdown based on Slack documentation and observations while building and testing this gem:
+Sign in behavior with team settings and signed in state can be confusing. Here is a breakdown based on Slack documentation and observations while using this gem:
 
 
 #### Team settings and sign in state vs Slack OAuth behavior. 
@@ -163,13 +163,28 @@ Sign in behavior with team settings and signed in state can be confusing. Here i
 * Current authorization is not requesting any non-identity scopes (but it's ok if the token already has non-identity scopes).
 
 
+### Redirect URI (optional)
+
+```ruby
+:redirect_uri => 'https://<defaults-to-the-app-origin-host-and-port>/auth/slack/callback'
+```
+
+*This setting overrides the `:callback_path` setting.*
+
+Set a custom redirect URI in your app, where Slack will redirect-to with an authorization code.
+The redirect URI, whether default or custom, MUST match a registered redirect URI in [your app settings on api.slack.com](https://api.slack.com/apps).
+See the [Slack OAuth docs](https://api.slack.com/docs/oauth) for more details on Redirect URI registration and matching rules.
+
+
 ### Callback Path (optional)
 
 ```ruby
 :callback_path => '/auth/slack/callback'
 ```
 
-The callback path in your app, where Slack will redirect to with an authorization code. Your app should trade the code for a token with the `oauth.access` API call.
+*This setting is ignored if `:redirect_uri` is set.*
+
+Set a custom callback path (path only, not the full URI) for Slack to redirect-to with an authorization code. This will be appended to the default redirect URI only. If you wish to specify a custom redirect URI with a custom callback path, just include both in the `:redirect_uri` setting.
 
 
 ### Skip Info (optional)
@@ -178,11 +193,11 @@ The callback path in your app, where Slack will redirect to with an authorizatio
 :skip_info => false
 ```
 
-Slack does not consider email to be an essential field, and therefore does not guarantee inclusion of email data in either the signin-with-slack or the add-to-slack flow.
+Slack does not consider user or email to be required response data, and therefore does not guarantee email data in either signin-with-slack or add-to-slack responses.
 
 Omniauth, however, considers email to be a required field. So adhearing to omniauth's spec means either forcing certain Slack scopes or always making multiple api requests for each authorization, which breaks (or renders useless) omniauth's skip_info feature.
 
-This version of omniauth-slack respects the skip_info feature. If set, only a single api request will be made for each authorization. The response of this request may or may not contain email data.
+This version of omniauth-slack respects the skip_info feature. If set, only a single api request will be made for each authorization. The response of that authorization request may or may not contain user or email data.
 
 
 ### Preload Data with Threads (optional)
@@ -191,8 +206,9 @@ This version of omniauth-slack respects the skip_info feature. If set, only a si
 :preload_data_with_threads => 0
 ```
 
-If given an integer > 0, omniauth-slack preloads the basic identity and info API-call responses, using the given number of pooled threads.
-The default (0) skips this feature and only loads those API calls if required (and authorized) to build the AuthHash.
+With passed integer > 0, omniauth-slack preloads the basic identity-and-info API call responses, from Slack, using *<#integer>* pooled threads.
+
+The default `0` skips this feature and only loads those API calls if required, and authorized, to build the AuthHash. *There are six possible calls to Slack from omniauth-slack, ATM.*
 
 ```ruby
 provider :slack, key, secret, :preload_data_with_threads => 3

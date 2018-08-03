@@ -6,7 +6,7 @@ module OmniAuth
     class Slack < OmniAuth::Strategies::OAuth2
       option :name, 'slack'
 
-      option :authorize_options, [:scope, :team, :team_domain]
+      option :authorize_options, [:scope, :team, :team_domain, :redirect_uri]
 
       option :client_options, {
         site: 'https://slack.com',
@@ -37,7 +37,6 @@ module OmniAuth
       
       credentials do
         {
-          #token: access_token.token,
           token: auth['token'],
           scope: (is_app_token ? all_scopes : auth['scope']),
           expires: false
@@ -149,13 +148,18 @@ module OmniAuth
       # See https://github.com/omniauth/omniauth/issues/390
       def authorize_params
         super.tap do |params|
-          %w[scope team].each do |v|
+          %w[scope team redirect_uri].each do |v|
             if !request.params[v].to_s.empty?
               params[v.to_sym] = request.params[v]
             end
           end
         end
       end
+      
+      # # Dropping query_string from callback_url apparently prevents some issues that cause csrf_detected errors.
+      # def callback_url
+      #   full_host + script_name + callback_path
+      # end
 
       
       private
