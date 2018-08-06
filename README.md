@@ -9,7 +9,7 @@ the [Slack OAuth2 authorization API](https://api.slack.com/docs/oauth), includin
 [Sign in with Slack](https://api.slack.com/docs/sign-in-with-slack) and
 [Add to Slack](https://api.slack.com/docs/slack-button) approval flows.
 
-This Gem supports Slack "classic" apps and tokens as well as "new" Workspace apps and tokens.
+This Gem supports Slack "classic" apps and tokens as well as the developerpreview of [Workspace apps and tokens](https://api.slack.com/workspace-apps-preview).
 
 
 ## Before You Begin
@@ -39,7 +39,7 @@ Replace `'API_KEY'` and `'API_SECRET'` with the appropriate values you obtained 
 Replace `'string-of-scopes'` with a comma (or space) separated string of Slack API scopes.
 
 
-For a basic [Sinatra](http://sinatrarb.com/) app:
+For a [Sinatra](http://sinatrarb.com/) app:
 
 ```ruby
 require 'sinatra'
@@ -193,11 +193,9 @@ Set a custom callback path (path only, not the full URI) for Slack to redirect-t
 :skip_info => false
 ```
 
-Slack does not consider user or email to be required response data, and therefore does not guarantee email data in either signin-with-slack or add-to-slack responses.
+Skip building the `InfoHash` section of the `AuthHash` object.
 
-Omniauth, however, considers email to be a required field. So adhearing to omniauth's spec means either forcing certain Slack scopes or always making multiple api requests for each authorization, which breaks (or renders useless) omniauth's skip_info feature.
-
-This version of omniauth-slack respects the skip_info feature. If set, only a single api request will be made for each authorization. The response of that authorization request may or may not contain user or email data.
+If set, only a single api request will be made for each authorization. The response of that authorization request may or may not contain user and email data.
 
 
 ### Preload Data with Threads (optional)
@@ -205,17 +203,35 @@ This version of omniauth-slack respects the skip_info feature. If set, only a si
 ```ruby
 :preload_data_with_threads => 0
 ```
+*This option is ignored if `skip_info` is set to `true`.*
 
 With passed integer > 0, omniauth-slack preloads the basic identity-and-info API call responses, from Slack, using *<#integer>* pooled threads.
 
-The default `0` skips this feature and only loads those API calls if required, and authorized, to build the AuthHash. *There are six possible calls to Slack from omniauth-slack, ATM.*
+The default `0` skips this feature and only loads those API calls if required, scoped, and authorized, to build the AuthHash.
 
 ```ruby
-provider :slack, key, secret, :preload_data_with_threads => 3
+provider :slack, key, secret, :preload_data_with_threads => 2
 ```
 
 More threads can potentially give a quicker callback phase.
-The caveat is an increase in request load on Slack, possibly affecting rate-limiting.
+The caveat is an increase in concurrent request load on Slack, possibly affecting rate limits.
+
+
+### Additional Data (*experimental*)
+
+This experimental feature allows additional API calls to be made during the omniauth-slack callback phase.
+Provide a hash of `{<name>: <proc-that-receives-env>}`, and the result will be attached as a hash
+under `additional_data` in the `extra` section of the `AuthHash`.
+
+```ruby
+provider :slack, key, secret,
+  additional_data: {
+    channels: proc{|env| env['omniauth.strategy'].access_token.get('/api/conversations.list').parsed['channels'] },
+    resources: proc{|env| env['omniauth.strategy'].access_token.get('/api/apps.permissions.resources.list').parsed }
+  }
+```
+
+*The exact syntax and behavior of this feature is not settled yet, but the above examples should work (assuming you have the correct scopes).*
 
 
 ## Workspace Apps and Tokens

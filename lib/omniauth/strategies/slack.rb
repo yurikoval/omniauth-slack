@@ -1,4 +1,5 @@
 require 'omniauth/strategies/oauth2'
+require 'thread'
 
 module OmniAuth
   module Strategies
@@ -29,6 +30,8 @@ module OmniAuth
       }
       
       option :preload_data_with_threads, 0
+      
+      option :additional_data, {}
 
       # User ID is not guaranteed to be globally unique across all Slack users.
       # The combination of user ID and team ID, on the other hand, is guaranteed
@@ -44,6 +47,7 @@ module OmniAuth
       end
 
       info do
+        additional_data
         num_threads = options.preload_data_with_threads.to_i
         if num_threads > 0 && !skip_info?
           preload_data_with_threads(num_threads)
@@ -132,15 +136,9 @@ module OmniAuth
           team_info: team_info,
           apps_permissions_users_list: apps_permissions_users_list,
           scopes_requested: env['omniauth.strategy'] && env['omniauth.strategy'].options && env['omniauth.strategy'].options.scope,
-          raw_info: {
-            auth: access_token.dup.tap{|i| i.remove_instance_variable(:@client)},
-            identity: @identity_raw,
-            user_info: @user_info_raw,
-            user_profile: @user_profile_raw,
-            team_info: @team_info_raw,
-            bot_info: @bot_info_raw,
-            apps_permissions_users_list_raw: @apps_permissions_users_list_raw
-          }
+          additional_data: !skip_info? ? options[:additional_data].inject({}){|hash,tupple| hash[tupple[0].to_s] = send(tupple[0].to_s); hash} : {},
+          #raw_info: @raw_info.merge!(auth: access_token.dup.tap{|i| i.remove_instance_variable(:@client)})
+          raw_info: @raw_info
         }
       end
       
@@ -156,6 +154,29 @@ module OmniAuth
         end
       end
       
+      # Get a new OAuth2::Client and define custom capabilities.
+      # * verrides super :client method.
+      #
+      # * Log API requests with OmniAuth.logger
+      # * Add API responses to @raw_info hash
+      #
+      def client
+        st_raw_info = raw_info
+        new_client = super
+        OmniAuth.logger.send(:debug, "(slack) New client #{new_client}")
+        
+        new_client.instance_eval do
+          define_singleton_method(:request) do |*args|
+            OmniAuth.logger.send(:debug, "(slack) API request #{args}; in thread #{Thread.current.object_id}")
+            request_output = super(*args)
+            uri = args[1].to_s.gsub(/^.*\/([^\/]+)/, '\1') # use single-quote or double-back-slash for replacement.
+            st_raw_info[uri.to_s]= request_output
+            request_output
+          end
+        end
+        new_client
+      end
+      
       # # Dropping query_string from callback_url apparently prevents some issues that cause csrf_detected errors.
       # def callback_url
       #   full_host + script_name + callback_path
@@ -164,12 +185,18 @@ module OmniAuth
       
       private
       
+      def semaphore
+        @semaphore ||= Mutex.new
+      end
+      
       # Preload additional api calls with a pool of threads.
       def preload_data_with_threads(num_threads=options.preload_data_with_threads.to_i)
+        return unless num_threads > 0
         log :debug, "Calling preload_data_with_threads(#{num_threads})."
         work_q = Queue.new
-        %w(apps_permissions_users_list identity user_info user_profile team_info bot_info).each{|x| work_q.push x }
-        workers = (0...(num_threads)).map do
+        %w(identity user_info user_profile team_info bot_info).concat(options[:additional_data].keys).each{|x| work_q.push x }
+        #workers = (0...(num_threads)).map do
+        workers = num_threads.to_i.times.map do
           Thread.new do
             begin
               while x = work_q.pop(true)
@@ -182,15 +209,30 @@ module OmniAuth
         workers.map(&:join); "ok"
       end
       
+      # Define methods for addional data from :additional_data option
+      def additional_data
+        hash = options[:additional_data]
+        if !hash&.empty?
+          hash.each do |k,v|
+            define_singleton_method(k) do
+              instance_variable_get(:"@#{k}") || 
+              instance_variable_set(:"@#{k}", v.respond_to?(:call) ? v.call(env) : v)
+            end
+          end
+        end
+      end
+      
       # Parsed data returned from /slack/oauth.access api call.
       def auth
         @auth ||= access_token.params.to_h.merge({'token' => access_token.token})
       end
 
       def identity
-        return {} unless has_scope?(identity: ['identity.basic','identity:read:user'])
-        @identity_raw ||= access_token.get('/api/users.identity', headers: {'X-Slack-User' => user_id})
-        @identity ||= @identity_raw.parsed
+        return {} unless !skip_info? && has_scope?(identity: ['identity.basic','identity:read:user'])
+        semaphore.synchronize {
+          @identity_raw ||= access_token.get('/api/users.identity', headers: {'X-Slack-User' => user_id})
+          @identity ||= @identity_raw.parsed
+        }
       end
 
       def user_identity
@@ -202,21 +244,27 @@ module OmniAuth
       end
 
       def user_info
-        return {} unless has_scope?(identity: 'users:read', team: 'users:read')
-        @user_info_raw ||= access_token.get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id})
-        @user_info ||= @user_info_raw.parsed
+        return {} unless !skip_info? && has_scope?(identity: 'users:read', team: 'users:read')
+        semaphore.synchronize {
+          @user_info_raw ||= access_token.get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id})
+          @user_info ||= @user_info_raw.parsed
+        }
       end
       
       def user_profile
-        return {} unless has_scope?(identity: 'users.profile:read', team: 'users.profile:read')
-        @user_profile_raw ||= access_token.get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id})
-        @user_profile ||= @user_profile_raw.parsed
+        return {} unless !skip_info? && has_scope?(identity: 'users.profile:read', team: 'users.profile:read')
+        semaphore.synchronize {
+          @user_profile_raw ||= access_token.get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id})
+          @user_profile ||= @user_profile_raw.parsed
+        }
       end
 
       def team_info
-        return {} unless has_scope?(identity: 'team:read', team: 'team:read')
-        @team_info_raw ||= access_token.get('/api/team.info')
-        @team_info ||= @team_info_raw.parsed
+        return {} unless !skip_info? && has_scope?(identity: 'team:read', team: 'team:read')
+        semaphore.synchronize {
+          @team_info_raw ||= access_token.get('/api/team.info')
+          @team_info ||= @team_info_raw.parsed
+        }
       end
 
       def web_hook_info
@@ -225,9 +273,11 @@ module OmniAuth
       end
       
       def bot_info
-        return {} unless has_scope?(identity: 'users:read')
-        @bot_info_raw ||= access_token.get('/api/bots.info')
-        @bot_info ||= @bot_info_raw.parsed
+        return {} unless !skip_info? && has_scope?(identity: 'users:read')
+        semaphore.synchronize {
+          @bot_info_raw ||= access_token.get('/api/bots.info')
+          @bot_info ||= @bot_info_raw.parsed
+        }
       end
       
       def user_id
@@ -244,9 +294,15 @@ module OmniAuth
       #
       # Returns [<id>: <resource>]
       def apps_permissions_users_list
-        return {} unless is_app_token
-        @apps_permissions_users_list_raw ||= access_token.get('/api/apps.permissions.users.list')
-        @apps_permissions_users_list ||= @apps_permissions_users_list_raw.parsed['resources'].inject({}){|h,i| h[i['id']] = i; h}
+        return {} unless !skip_info? && is_app_token
+        semaphore.synchronize {
+          @apps_permissions_users_list_raw ||= access_token.get('/api/apps.permissions.users.list')
+          @apps_permissions_users_list ||= @apps_permissions_users_list_raw.parsed['resources'].inject({}){|h,i| h[i['id']] = i; h}
+        }
+      end
+      
+      def raw_info
+        @raw_info ||= {}
       end
       
       # Is this a workspace app token?
