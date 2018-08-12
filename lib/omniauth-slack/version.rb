@@ -1,5 +1,5 @@
 module Omniauth
   module Slack
-    VERSION = "2.3.1.pre03"
+    VERSION = "2.4.0.pre01"
   end
 end
