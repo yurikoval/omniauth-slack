@@ -4,12 +4,12 @@ To view the original omniauth-slack from [@kmrshntr](https://github.com/kmrshntr
 
 # Omniauth::Slack
 
-This Gem contains the Slack strategy for OmniAuth and supports (almost) all features of
-the [Slack OAuth2 authorization API](https://api.slack.com/docs/oauth), including both
+This Gem contains the Slack strategy for OmniAuth and supports most features of
+the [Slack OAuth2 authorization API](https://api.slack.com/docs/oauth), including both the
 [Sign in with Slack](https://api.slack.com/docs/sign-in-with-slack) and
 [Add to Slack](https://api.slack.com/docs/slack-button) approval flows.
 
-This Gem supports Slack "classic" apps and tokens as well as the developerpreview of [Workspace apps and tokens](https://api.slack.com/workspace-apps-preview).
+This Gem supports Slack "classic" apps and tokens as well as the developer preview of [Workspace apps and tokens](https://api.slack.com/workspace-apps-preview).
 
 
 ## Before You Begin
@@ -68,25 +68,26 @@ end
 
 
 ## Scopes
-Slack lets you choose from a [few different scopes](https://api.slack.com/docs/oauth-scopes#scopes). *Here is another [list of Slack scopes](https://api.slack.com/scopes) with classic and new app compatibility information.*
+Slack lets you choose from a [few different scopes](https://api.slack.com/docs/oauth-scopes#scopes).
+*Here's another [table of Slack scopes](https://api.slack.com/scopes) showing classic and new app compatibility.*
 
-However, you cannot request both `identity` scopes and other scopes at the same time.
+**Important:** You cannot request both `identity` scopes and regular scopes in a single authorization request.
 
-If you need to combine regular app scopes with those used for “Sign in with Slack”, you should
-configure two providers:
+If you need to combine "Add to Slack" scopes with those used for "Sign in with Slack", you should configure two providers:
 
 ```ruby
 provider :slack, 'API_KEY', 'API_SECRET', scope: 'identity.basic', name: :sign_in_with_slack
 provider :slack, 'API_KEY', 'API_SECRET', scope: 'team:read,users:read,identify,bot'
 ```
 
-Use the first provider to sign users in and the second to add the application (and deeper capabilities) to their team.
+Use the first provider to sign users in and the second to add the application, and deeper capabilities, to their team.
 
-Slack is designed to allow quick authorization of users with minimally scoped requests. Deeper scope authorizations are intended to be acquired with further passes thru Slack's authorization process, as the needs of the user and the endpoint app require.
+Sign-in-with-Slack handles quick authorization of users with minimally scoped requests.
+Deeper scope authorizations are acquired with further passes through the Add-to-Slack authorization process.
 
 This works because Slack scopes are additive: Once you successfully authorize a scope, the token will possess that scope forever, regardless of what flow or scopes are requested at future authorizations.
 
-Removal of scope(s) requires revocation of the token.
+Removal of scope requires revocation of the token.
 
 
 ## Authentication Options

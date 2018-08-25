@@ -18,7 +18,11 @@ Gem::Specification.new do |spec|
 
   spec.add_runtime_dependency 'omniauth-oauth2', '~> 1.4'
 
-  spec.add_development_dependency 'bundler', '~> 1.11.2'
+  if RUBY_PLATFORM =~ /java/
+    spec.add_development_dependency 'bundler', '>= 1.11.2'
+  else
+    spec.add_development_dependency 'bundler', '>= 1.11.2'
+  end
   spec.add_development_dependency 'rake'
   spec.add_development_dependency 'minitest'
   spec.add_development_dependency 'mocha'

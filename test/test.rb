@@ -1,5 +1,7 @@
-require "helper"
-require "omniauth-slack"
+require 'helper'
+require 'omniauth-slack'
+
+OmniAuth.logger.level = 1
 
 class StrategyTest < StrategyTestCase
   include OAuth2StrategyTests
@@ -57,6 +59,7 @@ class CredentialsTest < StrategyTestCase
     @access_token.stubs(:expires_at)
     @access_token.stubs(:refresh_token)
     @access_token.stubs(:[])
+    @access_token.stubs(:params)
     strategy.stubs(:access_token).returns(@access_token)
   end
 
@@ -107,12 +110,14 @@ class UserInfoTest < StrategyTestCase
     super
     @access_token = stub("OAuth2::AccessToken")
     @access_token.stubs(:[])
+    @access_token.stubs(:params)
+    @access_token.stubs(:token)
     strategy.stubs(:access_token).returns(@access_token)
     strategy.stubs(:has_scope?).returns true
   end
 
   test "performs a GET to https://slack.com/api/users.identity" do
-    @access_token.expects(:get).with("/api/users.identity")
+    @access_token.expects(:get).with("/api/users.identity", {:headers => {"X-Slack-User" => nil}})
       .returns(stub_everything("OAuth2::Response"))
     strategy.identity
   end

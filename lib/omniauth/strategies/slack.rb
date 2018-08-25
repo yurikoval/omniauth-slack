@@ -32,7 +32,7 @@ module OmniAuth
       option :preload_data_with_threads, 0
       
       option :additional_data, {}
-
+      
       # User ID is not guaranteed to be globally unique across all Slack users.
       # The combination of user ID and team ID, on the other hand, is guaranteed
       # to be globally unique.
@@ -163,7 +163,7 @@ module OmniAuth
       def client
         st_raw_info = raw_info
         new_client = super
-        OmniAuth.logger.send(:debug, "(slack) New client #{new_client}")
+        log(:debug, "New client #{new_client}")
         
         new_client.instance_eval do
           define_singleton_method(:request) do |*args|
@@ -182,6 +182,14 @@ module OmniAuth
         full_host + script_name + callback_path
       end
 
+      def identity
+        return {} unless !skip_info? && has_scope?(identity: ['identity.basic','identity:read:user'])
+        semaphore.synchronize {
+          @identity_raw ||= access_token.get('/api/users.identity', headers: {'X-Slack-User' => user_id})
+          @identity ||= @identity_raw.parsed
+        }
+      end
+      
       
       private
       
@@ -225,14 +233,6 @@ module OmniAuth
       # Parsed data returned from /slack/oauth.access api call.
       def auth
         @auth ||= access_token.params.to_h.merge({'token' => access_token.token})
-      end
-
-      def identity
-        return {} unless !skip_info? && has_scope?(identity: ['identity.basic','identity:read:user'])
-        semaphore.synchronize {
-          @identity_raw ||= access_token.get('/api/users.identity', headers: {'X-Slack-User' => user_id})
-          @identity ||= @identity_raw.parsed
-        }
       end
 
       def user_identity
