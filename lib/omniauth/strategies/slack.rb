@@ -220,7 +220,7 @@ module OmniAuth
       # Define methods for addional data from :additional_data option
       def additional_data
         hash = options[:additional_data]
-        if !hash&.empty?
+        if !hash.to_h.empty?
           hash.each do |k,v|
             define_singleton_method(k) do
               instance_variable_get(:"@#{k}") || 
