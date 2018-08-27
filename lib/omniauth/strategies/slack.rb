@@ -31,6 +31,10 @@ module OmniAuth
       
       option :preload_data_with_threads, 0
       
+      option :include_data, []
+      
+      option :exclude_data, []
+      
       option :additional_data, {}
       
       # User ID is not guaranteed to be globally unique across all Slack users.
@@ -47,7 +51,9 @@ module OmniAuth
       end
 
       info do
-        additional_data
+        define_additional_data
+        semaphore
+        
         num_threads = options.preload_data_with_threads.to_i
         if num_threads > 0 && !skip_info?
           preload_data_with_threads(num_threads)
@@ -127,6 +133,7 @@ module OmniAuth
 
       extra do
         {
+          scopes_requested: env['omniauth.strategy'] && env['omniauth.strategy'].options && env['omniauth.strategy'].options.scope,
           web_hook_info: web_hook_info,
           bot_info: auth['bot'] || bot_info['bot'],
           auth: auth,
@@ -135,9 +142,7 @@ module OmniAuth
           user_profile: user_profile,
           team_info: team_info,
           apps_permissions_users_list: apps_permissions_users_list,
-          scopes_requested: env['omniauth.strategy'] && env['omniauth.strategy'].options && env['omniauth.strategy'].options.scope,
-          additional_data: !skip_info? ? options[:additional_data].inject({}){|hash,tupple| hash[tupple[0].to_s] = send(tupple[0].to_s); hash} : {},
-          #raw_info: @raw_info.merge!(auth: access_token.dup.tap{|i| i.remove_instance_variable(:@client)})
+          additional_data: get_additional_data,
           raw_info: @raw_info
         }
       end
@@ -163,11 +168,11 @@ module OmniAuth
       def client
         st_raw_info = raw_info
         new_client = super
-        log(:debug, "New client #{new_client}")
+        log(:debug, "New client #{new_client}.")
         
         new_client.instance_eval do
           define_singleton_method(:request) do |*args|
-            OmniAuth.logger.send(:debug, "(slack) API request #{args}; in thread #{Thread.current.object_id}")
+            OmniAuth.logger.send(:debug, "(slack) API request #{args[0..1]}; in thread #{Thread.current.object_id}.")
             request_output = super(*args)
             uri = args[1].to_s.gsub(/^.*\/([^\/]+)/, '\1') # use single-quote or double-back-slash for replacement.
             st_raw_info[uri.to_s]= request_output
@@ -183,7 +188,7 @@ module OmniAuth
       end
 
       def identity
-        return {} unless !skip_info? && has_scope?(identity: ['identity.basic','identity:read:user'])
+        return {} unless !skip_info? && has_scope?(identity: ['identity.basic','identity:read:user']) && is_not_excluded?
         semaphore.synchronize {
           @identity_raw ||= access_token.get('/api/users.identity', headers: {'X-Slack-User' => user_id})
           @identity ||= @identity_raw.parsed
@@ -197,17 +202,38 @@ module OmniAuth
         @semaphore ||= Mutex.new
       end
       
+      def active_methods
+        @active_methods ||= (
+          includes = [options.include_data].flatten.compact
+          excludes = [options.exclude_data].flatten.compact unless includes.size > 0
+          method_list = %w(apps_permissions_users_list identity user_info user_profile team_info bot_info)  #.concat(options[:additional_data].keys)
+          if includes.size > 0
+            method_list.keep_if {|m| includes.include?(m.to_s) || includes.include?(m.to_s.to_sym)}
+          elsif excludes.size > 0
+            method_list.delete_if {|m| excludes.include?(m.to_s) || excludes.include?(m.to_s.to_sym)}
+          end
+          log :debug, "Activated API calls: #{method_list}."
+          log :debug, "Activated additional_data calls: #{options.additional_data.keys}."
+          method_list
+        )
+      end
+      
+      def is_not_excluded?(method_name = caller[0][/`([^']*)'/, 1])
+        active_methods.include?(method_name.to_s) || active_methods.include?(method_name.to_s.to_sym)
+      end
+      
       # Preload additional api calls with a pool of threads.
-      def preload_data_with_threads(num_threads=options.preload_data_with_threads.to_i)
+      def preload_data_with_threads(num_threads)
         return unless num_threads > 0
-        log :debug, "Calling preload_data_with_threads(#{num_threads})."
+        preload_methods = active_methods.concat(options[:additional_data].keys)
+        log :info, "Preloading (#{preload_methods.size}) data requests using (#{num_threads}) threads."
         work_q = Queue.new
-        %w(identity user_info user_profile team_info bot_info).concat(options[:additional_data].keys).each{|x| work_q.push x }
-        #workers = (0...(num_threads)).map do
+        preload_methods.each{|x| work_q.push x }
         workers = num_threads.to_i.times.map do
           Thread.new do
             begin
               while x = work_q.pop(true)
+                log :debug, "Preloading #{x}."
                 send x
               end
             rescue ThreadError
@@ -218,7 +244,7 @@ module OmniAuth
       end
       
       # Define methods for addional data from :additional_data option
-      def additional_data
+      def define_additional_data
         hash = options[:additional_data]
         if !hash.to_h.empty?
           hash.each do |k,v|
@@ -226,6 +252,17 @@ module OmniAuth
               instance_variable_get(:"@#{k}") || 
               instance_variable_set(:"@#{k}", v.respond_to?(:call) ? v.call(env) : v)
             end
+          end
+        end
+      end
+      
+      def get_additional_data
+        if skip_info?
+          {}
+        else
+          options[:additional_data].inject({}) do |hash,tupple|
+            hash[tupple[0].to_s] = send(tupple[0].to_s)
+            hash
           end
         end
       end
@@ -244,7 +281,7 @@ module OmniAuth
       end
 
       def user_info
-        return {} unless !skip_info? && has_scope?(identity: 'users:read', team: 'users:read')
+        return {} unless !skip_info? && has_scope?(identity: 'users:read', team: 'users:read') && is_not_excluded?
         semaphore.synchronize {
           @user_info_raw ||= access_token.get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id})
           @user_info ||= @user_info_raw.parsed
@@ -252,7 +289,7 @@ module OmniAuth
       end
       
       def user_profile
-        return {} unless !skip_info? && has_scope?(identity: 'users.profile:read', team: 'users.profile:read')
+        return {} unless !skip_info? && has_scope?(identity: 'users.profile:read', team: 'users.profile:read') && is_not_excluded?
         semaphore.synchronize {
           @user_profile_raw ||= access_token.get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id})
           @user_profile ||= @user_profile_raw.parsed
@@ -260,7 +297,7 @@ module OmniAuth
       end
 
       def team_info
-        return {} unless !skip_info? && has_scope?(identity: 'team:read', team: 'team:read')
+        return {} unless !skip_info? && has_scope?(identity: 'team:read', team: 'team:read') && is_not_excluded?
         semaphore.synchronize {
           @team_info_raw ||= access_token.get('/api/team.info')
           @team_info ||= @team_info_raw.parsed
@@ -273,7 +310,7 @@ module OmniAuth
       end
       
       def bot_info
-        return {} unless !skip_info? && has_scope?(identity: 'users:read')
+        return {} unless !skip_info? && has_scope?(identity: 'users:read') && is_not_excluded?
         semaphore.synchronize {
           @bot_info_raw ||= access_token.get('/api/bots.info')
           @bot_info ||= @bot_info_raw.parsed

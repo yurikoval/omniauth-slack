@@ -108,7 +108,8 @@ https://slack.com/oauth/authorize?scope=identity.basic,identity.email&team=team-
 More information on provider and authentication options can be found in omniauth-slack's supporting gems [omniauth](https://github.com/omniauth/omniauth), [oauth2](https://github.com/oauth-xx/oauth2), and [omniauth-oauth2](https://github.com/omniauth/omniauth-oauth2).
 
 
-### Scope (required)
+### Scope
+*required*
 
 ```ruby
 :scope => 'string-of-comma-or-space-separated-scopes'
@@ -117,7 +118,8 @@ More information on provider and authentication options can be found in omniauth
 Specify the scopes you would like to add to the token during this authorization request.
 
   
-### Team (optional)
+### Team
+*optional*
 
 ```ruby
 :team => 'team-id'
@@ -164,7 +166,8 @@ Sign in behavior with team settings and signed in state can be confusing. Here i
 * Current authorization is not requesting any non-identity scopes (but it's ok if the token already has non-identity scopes).
 
 
-### Redirect URI (optional)
+### Redirect URI
+*optional*
 
 ```ruby
 :redirect_uri => 'https://<defaults-to-the-app-origin-host-and-port>/auth/slack/callback'
@@ -177,7 +180,8 @@ The redirect URI, whether default or custom, MUST match a registered redirect UR
 See the [Slack OAuth docs](https://api.slack.com/docs/oauth) for more details on Redirect URI registration and matching rules.
 
 
-### Callback Path (optional)
+### Callback Path 
+*optional*
 
 ```ruby
 :callback_path => '/auth/slack/callback'
@@ -188,7 +192,8 @@ See the [Slack OAuth docs](https://api.slack.com/docs/oauth) for more details on
 Set a custom callback path (path only, not the full URI) for Slack to redirect-to with an authorization code. This will be appended to the default redirect URI only. If you wish to specify a custom redirect URI with a custom callback path, just include both in the `:redirect_uri` setting.
 
 
-### Skip Info (optional)
+### Skip Info 
+*optional*
 
 ```ruby
 :skip_info => false
@@ -199,12 +204,36 @@ Skip building the `InfoHash` section of the `AuthHash` object.
 If set, only a single api request will be made for each authorization. The response of that authorization request may or may not contain user and email data.
 
 
-### Preload Data with Threads (optional)
+### Include/Exclude Data
+*optional*
+
+```ruby
+  :include_data => %w(identity user_info user_profile)
+  
+  # or
+  
+  :exclude_data => %w(user_info team_info bot_info)
+```
+*These options are ignored if `:skip_info => true` is set.*
+
+Specify which API calls to include or exclude after the initial authorization call.
+This will affect what data you see in the AuthHash object. These two options are mutually exclusive. Use one or the other but not both. If neither option is declared, all API calls will be made (depending on scope and permissions).
+
+The currently available calls are
+* identity
+* user_info
+* user_profile
+* team_info
+* bot_info
+
+
+### Preload Data with Threads
+*optional*
 
 ```ruby
 :preload_data_with_threads => 0
 ```
-*This option is ignored if `skip_info` is set to `true`.*
+*This option is ignored if `:skip_info => true` is set.*
 
 With passed integer > 0, omniauth-slack preloads the basic identity-and-info API call responses, from Slack, using *<#integer>* pooled threads.
 
@@ -218,7 +247,8 @@ More threads can potentially give a quicker callback phase.
 The caveat is an increase in concurrent request load on Slack, possibly affecting rate limits.
 
 
-### Additional Data (*experimental*)
+### Additional Data
+*experimental*
 
 This experimental feature allows additional API calls to be made during the omniauth-slack callback phase.
 Provide a hash of `{<name>: <proc-that-receives-env>}`, and the result will be attached as a hash
@@ -249,7 +279,7 @@ This gem provides support for Slack's developer preview of [Workspace apps](http
 
 The AuthHash from this gem has the standard components of an `OmniAuth::AuthHash` object, with some additional data added to the `:info` and `:extra` sections.
 
-If the scopes allow, additional api calls *may* be made to gather additional user and team info, unless the `:skip_info` option is set.
+If the scopes allow, additional api calls *may* be made to gather additional user and team info, unless the `:skip_info => true` is set.
 
 The `:extra` section contains the parsed data from each of the api calls made during the authorization.
 Also included is a `:raw_info` hash, which in turn contains the raw response object from each of the api calls.
