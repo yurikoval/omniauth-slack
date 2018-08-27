@@ -104,7 +104,7 @@ class CredentialsTest < StrategyTestCase
   end
 end
 
-class UserInfoTest < StrategyTestCase
+class IdentityTest < StrategyTestCase
 
   def setup
     super

@@ -133,7 +133,8 @@ module OmniAuth
 
       extra do
         {
-          scopes_requested: env['omniauth.strategy'] && env['omniauth.strategy'].options && env['omniauth.strategy'].options.scope,
+          scopes_requested: (env['omniauth.params'] && env['omniauth.params']['scope']) || \
+            (env['omniauth.strategy'] && env['omniauth.strategy'].options && env['omniauth.strategy'].options.scope),
           web_hook_info: web_hook_info,
           bot_info: auth['bot'] || bot_info['bot'],
           auth: auth,
