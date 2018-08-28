@@ -173,3 +173,32 @@ class AuthorizeParamsTest < StrategyTestCase
   end
   
 end
+
+class InitializeTest < StrategyTestCase
+
+  test 'sets @main_semaphore with a new Mutex' do
+    assert_kind_of Mutex, strategy.instance_variable_get(:@main_semaphore)
+  end
+  
+  test 'sets @semaphores with empty hash' do
+    assert_equal( {}, strategy.instance_variable_get(:@semaphores) )
+  end
+
+end
+
+class SemaphoreTest < StrategyTestCase
+
+  def setup
+    super
+    
+    def strategy.test_method
+      send :semaphore
+    end
+  end
+
+  test 'synchronized management of method-specific mutexes' do
+    strategy.test_method
+    assert_kind_of Mutex, strategy.instance_variable_get(:@semaphores)['test_method']
+  end
+
+end
