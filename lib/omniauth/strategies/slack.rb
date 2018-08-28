@@ -45,7 +45,7 @@ module OmniAuth
       credentials do
         {
           token: auth['token'],
-          scope: (is_app_token ? all_scopes : auth['scope']),
+          scope: (is_app_token? ? all_scopes : auth['scope']),
           expires: false
         }
       end
@@ -342,7 +342,7 @@ module OmniAuth
       #
       # Returns [<id>: <resource>]
       def apps_permissions_users_list
-        return {} unless !skip_info? && is_app_token
+        return {} unless !skip_info? && is_app_token?
         semaphore.synchronize {
           @apps_permissions_users_list_raw ||= access_token.get('/api/apps.permissions.users.list')
           @apps_permissions_users_list ||= @apps_permissions_users_list_raw.parsed['resources'].inject({}){|h,i| h[i['id']] = i; h}
@@ -354,7 +354,7 @@ module OmniAuth
       end
       
       # Is this a workspace app token?
-      def is_app_token
+      def is_app_token?
         auth['token_type'].to_s == 'app'
       end
       

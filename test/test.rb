@@ -223,3 +223,24 @@ class ActiveMethodsTest < StrategyTestCase
   end
 
 end
+
+class IsNotExcluded < StrategyTestCase
+
+  def setup
+    super
+    
+    def identity
+      strategy.send 'is_not_excluded?'
+    end
+  end
+
+  test 'returns true if calling method is in active-methods' do
+    assert_equal true, identity
+  end
+  
+  test 'returns false if calling method is not in active-methods' do
+    strategy.options[:exclude_data] = 'identity'
+    assert_equal false, identity
+  end
+
+end
