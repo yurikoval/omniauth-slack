@@ -130,7 +130,24 @@ class SkipInfoTest < StrategyTestCase
     @options = { skip_info: true }
     #strategy.stubs(:identity).returns({})
     strategy.stubs(:auth).returns({})
-    assert_equal %w[name email user_id team_name team_id image], strategy.info.keys.map(&:to_s)
+    assert_equal %w(name email user_id team_name team_id image), strategy.info.keys.map(&:to_s)
   end
 
+end
+
+class AuthorizeParamsTest < StrategyTestCase
+
+  test 'returns OmniAuth::Strategy::Options hash' do
+    assert_kind_of OmniAuth::Strategy::Options, strategy.authorize_params
+  end
+  
+  test 'forwards request params (scope, team, redirect_uri) to slack' do
+    strategy.request.params['scope'] = 'test-scope'
+    strategy.request.params['team'] = 'test-team'
+    strategy.request.params['redirect_uri'] = 'http://my-test-uri/auth/callback'
+    assert_equal 'test-scope', strategy.authorize_params['scope']
+    assert_equal 'test-team', strategy.authorize_params['team']
+    assert_equal 'http://my-test-uri/auth/callback', strategy.authorize_params['redirect_uri']
+  end
+  
 end

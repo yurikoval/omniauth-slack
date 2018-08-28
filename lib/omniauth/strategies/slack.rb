@@ -152,7 +152,7 @@ module OmniAuth
       # See https://github.com/omniauth/omniauth/issues/390
       def authorize_params
         super.tap do |params|
-          %w[scope team redirect_uri].each do |v|
+          %w(scope team redirect_uri).each do |v|
             if !request.params[v].to_s.empty?
               params[v.to_sym] = request.params[v]
             end
