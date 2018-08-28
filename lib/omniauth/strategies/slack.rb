@@ -250,7 +250,7 @@ module OmniAuth
             rescue ThreadError
             end
           end
-        end; "ok"
+        end
         workers.map(&:join); "ok"
       end
       
