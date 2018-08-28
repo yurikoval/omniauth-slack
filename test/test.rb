@@ -202,3 +202,24 @@ class SemaphoreTest < StrategyTestCase
   end
 
 end
+
+class ActiveMethodsTest < StrategyTestCase
+
+  test 'with no settings, returns all defined api methods' do
+    assert_equal %w(apps_permissions_users_list identity user_info user_profile team_info bot_info),
+      strategy.send(:active_methods)
+  end
+  
+  test 'with :include_data, returns only included methods' do
+    strategy.options[:include_data] = %w(identity team_info)
+    assert_equal %w(identity team_info),
+      strategy.send(:active_methods)    
+  end
+
+  test 'with :exclude_data, returns all but excluded methods' do
+    strategy.options[:exclude_data] = %w(identity team_info)
+    assert_equal %w(apps_permissions_users_list user_info user_profile bot_info),
+      strategy.send(:active_methods)    
+  end
+
+end
