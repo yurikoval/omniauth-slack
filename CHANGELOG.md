@@ -1,4 +1,5 @@
-## v2.4.0 (unreleased)
+## v2.4.0
+
 Initial release of ginjo-omniauth-slack
 
 * Add/fix AuthHash `extra['scopes_requested']`. [wbr]

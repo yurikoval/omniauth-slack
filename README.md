@@ -2,7 +2,7 @@
 
 To view the original omniauth-slack from [@kmrshntr](https://github.com/kmrshntr), go [here](https://github.com/kmrshntr/omniauth-slack).
 
-# Omniauth::Slack
+# OmniAuth::Slack
 
 This Gem contains the Slack strategy for OmniAuth and supports most features of
 the [Slack OAuth2 authorization API](https://api.slack.com/docs/oauth), including both the
@@ -21,10 +21,16 @@ Now sign into the [Slack application dashboard](https://api.slack.com/applicatio
 
 ## Using This Strategy
 
-First start by adding this gem to your Gemfile (This will install the latest HEAD version from the ginjo repository):
+First start by adding this gem to your Gemfile:
 
 ```ruby
-gem 'omniauth-slack', git: 'https://github.com/ginjo/omniauth-slack'
+gem 'ginjo-omniauth-slack'
+```
+
+Or specify the latest HEAD version from the ginjo repository:
+
+```ruby
+gem 'ginjo-omniauth-slack', git: 'https://github.com/ginjo/omniauth-slack'
 ```
 
 Next, tell OmniAuth about this provider. For a Rails app, your `config/initializers/omniauth.rb` file should look like this:
@@ -67,6 +73,18 @@ end
 ```
 
 
+To manually install and require the gem:
+```bash
+# shell
+gem install ginjo-omniauth-slack
+````
+
+```ruby
+# ruby
+require 'omniauth-slack'
+```
+
+
 ## Scopes
 Slack lets you choose from a [few different scopes](https://api.slack.com/docs/oauth-scopes#scopes).
 *Here's another [table of Slack scopes](https://api.slack.com/scopes) showing classic and new app compatibility.*
@@ -97,7 +115,7 @@ You will need to specify at least one scope to get a successful authentication a
 
 Some of these options can also be given at runtime in the authorization request url.
 
-`scope`, `team`, `team_domain`, and `redirect_uri` can be given at runtime. `scope`, `team`, and `redirect_uri` will be passed directly through to Slack in the OAuth GET request.
+`scope`, `team`, `team_domain`, and `redirect_uri` can be given at runtime. `scope`, `team`, and `redirect_uri` will be passed directly through to Slack in the OAuth GET request:
 
 ```ruby
 https://slack.com/oauth/authorize?scope=identity.basic,identity.email&team=team-id&redirect_uri=https://different.subdomain/different/callback/path
@@ -143,7 +161,7 @@ Another (possibly undocumented) way to specify team is by passing in the `:team_
 In contrast to setting `:team`, setting `:team_domain` will force authentication against the specified team (credentials permitting of course), even if the user is not signed in to that team.
 However, if you are already signed in to that team, specifying the `:team_domain` alone will not let you skip the Slack authorization dialog, as is possible when you specify `:team`.
 
-Sign in behavior with team settings and signed in state can be confusing. Here is a breakdown based on Slack documentation and observations while using this gem:
+Sign in behavior with team settings and signed in state can be confusing. Here is a breakdown based on Slack documentation and observations while using this gem.
 
 
 #### Team settings and sign in state vs Slack OAuth behavior. 
@@ -219,7 +237,8 @@ If set, only a single api request will be made for each authorization. The respo
 Specify which API calls to include or exclude after the initial authorization call.
 This will affect what data you see in the AuthHash object. These two options are mutually exclusive. Use one or the other but not both. If neither option is declared, all API calls will be made (depending on scope and permissions).
 
-The currently available calls are
+The currently available calls are:
+
 * identity
 * user_info
 * user_profile
@@ -261,8 +280,6 @@ provider :slack, key, secret,
     resources: proc{|env| env['omniauth.strategy'].access_token.get('/api/apps.permissions.resources.list').parsed }
   }
 ```
-
-*The exact syntax and behavior of this feature is not settled yet, but the above examples should work (assuming you have the correct scopes).*
 
 
 ## Workspace Apps and Tokens
