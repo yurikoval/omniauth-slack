@@ -19,6 +19,28 @@ class ClientTest < StrategyTestCase
   test "has correct token url" do
     assert_equal "/api/oauth.access", strategy.client.options[:token_url]
   end
+  
+  test 'request logs api call' do
+    OAuth2::Client.class_eval do
+      def request(*args)
+        {simple: 'hash'}
+      end
+    end
+    @client = strategy.client
+    OmniAuth.logger.expects(:send).with(){|*params| assert_equal :debug, params[0]}
+    @client.request(:get, 'http://test-url')
+  end
+  
+  test 'request adds api response to raw_info hash' do
+    OAuth2::Client.class_eval do
+      def request(*args)
+        {simple: 'hash'}
+      end
+    end
+    @client = strategy.client
+    @client.request(:get, 'http://test-url')
+    assert_equal( {'test-url' => {simple: 'hash'}}, strategy.send(:raw_info) )
+  end
 end
 
 class CallbackUrlTest < StrategyTestCase
