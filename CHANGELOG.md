@@ -1,6 +1,8 @@
-## v2.4.0
+## v2.4.0 (2018-08-28)
 
 Initial release of ginjo-omniauth-slack
+
+* Update gemspec dependencies.
 
 * Add/fix AuthHash `extra['scopes_requested']`. [wbr]
 
@@ -35,7 +37,7 @@ Initial release of ginjo-omniauth-slack
 * Add test coverage for new functionality. [wbr]
 
 
-### Additional changes logged between 2.2.0 release and ginjo fork/refactor
+### Additional changes logged between 2.3.0 release and ginjo fork/refactor
 
 The specifics of these commits may or may not be relevant in the ginjo fork, but their functionality is covered in one way or another.
 
