@@ -1,5 +1,6 @@
 require 'omniauth/strategies/oauth2'
 require 'thread'
+require 'uri'
 
 module OmniAuth
   module Strategies
@@ -12,16 +13,6 @@ module OmniAuth
       option :client_options, {
         site: 'https://slack.com',
         token_url: '/api/oauth.access'
-      }
-
-      # Add team_domain to site subdomain if provided in auth url or provider options. 
-      option :setup, lambda{|env|
-        strategy = env['omniauth.strategy']
-        team_domain = strategy.request.params['team_domain'] || strategy.options[:team_domain]
-        site = strategy.options[:client_options]['site']
-        strategy.options[:client_options].site = (
-          !team_domain.to_s.empty? ? site.sub(/\:\\\\/, "://#{team_domain}.") : site
-        )
       }
       
       option :auth_token_params, {
@@ -51,10 +42,14 @@ module OmniAuth
       end
 
       info do
-        define_additional_data
-        semaphore
+      
+        unless skip_info?
+          define_additional_data
+          semaphore
+        end
         
         num_threads = options.preload_data_with_threads.to_i
+        
         if num_threads > 0 && !skip_info?
           preload_data_with_threads(num_threads)
         end
@@ -147,6 +142,7 @@ module OmniAuth
           raw_info: @raw_info
         }
       end
+
       
       # Pass on certain authorize_params to the Slack authorization GET request.
       # See https://github.com/omniauth/omniauth/issues/390
@@ -157,29 +153,37 @@ module OmniAuth
               params[v.to_sym] = request.params[v]
             end
           end
+          log(:debug, "Authorize_params #{params.to_h}")
         end
       end
       
-      # Get a new OAuth2::Client and define custom capabilities.
-      # * verrides super :client method.
+      # Get a new OAuth2::Client and define custom behavior.
+      # * overrides previous omniauth-strategies-oauth2 :client definition.
       #
       # * Log API requests with OmniAuth.logger
       # * Add API responses to @raw_info hash
+      # * Set auth site uri with custom subdomain (if provided).
       #
       def client
-        st_raw_info = raw_info
         new_client = super
-        log(:debug, "New client #{new_client}.")
         
-        new_client.instance_eval do
-          define_singleton_method(:request) do |*args|
-            OmniAuth.logger.send(:debug, "(slack) API request #{args[0..1]}; in thread #{Thread.current.object_id}.")
-            request_output = super(*args)
-            uri = args[1].to_s.gsub(/^.*\/([^\/]+)/, '\1') # use single-quote or double-back-slash for replacement.
-            st_raw_info[uri.to_s]= request_output
-            request_output
-          end
+        team_domain = request.params['team_domain'] || options[:team_domain]
+        if !team_domain.to_s.empty?
+          site_uri = URI.parse(options[:client_options]['site'])
+          site_uri.host = "#{team_domain}.slack.com"
+          new_client.site = site_uri.to_s
+          log(:debug, "Oauth site uri with custom team_domain #{site_uri}")
         end
+        
+        st_raw_info = raw_info
+        new_client.define_singleton_method(:request) do |*args|
+          OmniAuth.logger.send(:debug, "(slack) API request #{args[0..1]}; in thread #{Thread.current.object_id}.")
+          request_output = super(*args)
+          uri = args[1].to_s.gsub(/^.*\/([^\/]+)/, '\1') # use single-quote or double-back-slash for replacement.
+          st_raw_info[uri.to_s]= request_output
+          request_output
+        end
+        
         new_client
       end
       
@@ -342,7 +346,7 @@ module OmniAuth
       #
       # Returns [<id>: <resource>]
       def apps_permissions_users_list
-        return {} unless !skip_info? && is_app_token?
+        return {} unless !skip_info? && is_app_token? && is_not_excluded?
         semaphore.synchronize {
           @apps_permissions_users_list_raw ||= access_token.get('/api/apps.permissions.users.list')
           @apps_permissions_users_list ||= @apps_permissions_users_list_raw.parsed['resources'].inject({}){|h,i| h[i['id']] = i; h}

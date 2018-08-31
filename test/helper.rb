@@ -55,3 +55,4 @@ class StrategyTestCase < TestCase
 end
 
 Dir[File.expand_path("../support/**/*", __FILE__)].each(&method(:require))
+
