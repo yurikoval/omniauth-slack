@@ -19,6 +19,10 @@ class ClientTest < StrategyTestCase
   test "has correct token url" do
     assert_equal "/api/oauth.access", strategy.client.options[:token_url]
   end
+
+  test "has correct auth_scheme" do
+    assert_equal :basic_auth, strategy.client.options[:auth_scheme]
+  end
   
   test 'request logs api call' do
     OAuth2::Client.class_eval do
