@@ -393,6 +393,18 @@ module OmniAuth
         end
       end
       
+      def self.ad_hoc_client(client_id, client_key, token)
+        puts default_options['client_options'].to_yaml
+        ::OAuth2::AccessToken.new(
+          ::OAuth2::Client.new(
+            client_id,
+            client_key,
+            default_options['client_options'].map{|k,v| [k.to_sym, v]}.to_h
+          ),
+          token
+        )
+      end
+      
     end
   end
 end
