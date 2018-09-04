@@ -10,10 +10,8 @@ module OmniAuth
       
       access_token = case
         when token_string_or_hash.is_a?(String)
-          puts "Creating new ad-hoc AccessToken"
           ::OAuth2::AccessToken.new(client, token_string_or_hash)
         when token_string_or_hash.is_a?(Hash)
-          puts "Resurecting AccessToken from hash"
           ::OAuth2::AccessToken.from_hash(client, token_string_or_hash)
       end
       
