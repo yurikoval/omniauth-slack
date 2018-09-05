@@ -35,11 +35,18 @@ module OmniAuth
       # to be globally unique.
       uid { "#{user_id}-#{team_id}" }
       
+#       credentials do
+#         {scope: (is_app_token? ? all_scopes : auth['scope'])}
+#       end
+      
       credentials do
         {
           token: auth['token'],
-          scope: (is_app_token? ? all_scopes : auth['scope']),
-          expires: false
+          token_type: auth['token_type'],
+          expires: (auth['expires_in'] || auth['expires_at'] ? true : false),
+          expires_in: auth['expires_in'],
+          expires_at: auth['expires_at'],
+          scope: (is_app_token? ? all_scopes : auth['scope'])
         }
       end
 
@@ -374,7 +381,8 @@ module OmniAuth
       
       # Is this a workspace app token?
       def is_app_token?
-        auth['token_type'].to_s == 'app'
+        #auth['token_type'].to_s == 'app'
+        access_token.is_app_token?
       end
       
       # Scopes come from at least 3 different places now.

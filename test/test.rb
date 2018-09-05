@@ -86,6 +86,7 @@ class CredentialsTest < StrategyTestCase
     @access_token.stubs(:refresh_token)
     @access_token.stubs(:[])
     @access_token.stubs(:params)
+    @access_token.stubs(:is_app_token?)
     strategy.stubs(:access_token).returns(@access_token)
   end
 

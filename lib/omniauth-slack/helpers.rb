@@ -65,10 +65,11 @@ module OmniAuth
         end
       
         def apps_permissions_users_list
+          return {}
           semaphore.synchronize {
             @apps_permissions_users_list ||= (
               get('/api/apps.permissions.users.list')
-            ).parsed['resources'].inject({}){|h,i| h[i['id']] = i; h}
+            ).parsed['resources'].to_h.inject({}){|h,i| h[i['id']] = i; h}
           }
         end
         
@@ -114,6 +115,12 @@ module OmniAuth
               all_scopes[section.to_s].to_a.include?(scope.to_s)
             end
           end
+        end
+        
+        def refresh!(*args)
+          new_token = super
+          new_token.extend Helpers::AccessToken
+          new_token
         end
             
       end # AccessToken
