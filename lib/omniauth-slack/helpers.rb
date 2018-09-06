@@ -27,6 +27,7 @@ module OmniAuth
         
     module Helpers
       module Client
+      
         def self.extended(other)
           other.instance_eval do
             singleton_class.send :attr_accessor, :logger, :history, :subdomain
@@ -54,7 +55,8 @@ module OmniAuth
             logger.send(:debug, "Oauth site uri with custom team_domain #{site_uri}")
             site
           end
-        end      
+        end
+        
       end # Client    
     
     
@@ -102,11 +104,11 @@ module OmniAuth
         end
       
         def apps_permissions_users_list
-          #return {}
+          return {} unless is_app_token?
           semaphore.synchronize {
             @apps_permissions_users_list ||= (
               get('/api/apps.permissions.users.list')
-            ).parsed['resources'].to_h.inject({}){|h,i| h[i['id']] = i; h}
+            ).parsed['resources'].to_h.inject({}){|h,i| h[i['id']] = i; h} || {}
           }
         end
         
@@ -115,37 +117,80 @@ module OmniAuth
             semaphore.synchronize {
             @apps_permissions_scopes_list ||= (
               get('/api/apps.permissions.scopes.list')
-            ).parsed['scopes']
+            ).parsed['scopes'] || {}
           }
         end
         
+        # def all_scopes
+        #   @all_scopes ||=
+        #   {'identity' => (params['scope'] || apps_permissions_users_list[user_id].to_h['scopes'].to_a.join(',')).to_s.split(',')}
+        #   .merge(params['scopes'] || apps_permissions_scopes_list || {})
+        # end
+        
+        # This puts all compiled scopes back into params['scopes']
         def all_scopes
-          @all_scopes ||=
-          {'identity' => (params['scope'] || apps_permissions_users_list[user_id].to_h['scopes'].to_a.join(',')).to_s.split(',')}
-          .merge(params['scopes'] || apps_permissions_scopes_list || {})
+          @all_scopes ||= (
+            scopes = case
+              when params['scope']
+                {'classic' => params['scope'].split(/[, ]/)}
+              when params['scopes'].to_h['identity']
+                params['scopes']
+              when params['scopes']
+                {'identity' => apps_permissions_users_list}.merge(params['scopes'])
+              else
+                {'identity' => apps_permissions_users_list}.merge(apps_permissions_scopes_list)
+            end
+            params['scopes'] = scopes
+          )
         end
       
         # Determine if given scopes exist in current authorization.
         # scopes_hash is hash where:
         #   key == scope type <identity|app_home|team|channel|group|mpim|im>
         #   val == array or string of individual scopes.
-        def has_scope?(_logic=:'or', _all_scopes=all_scopes, scopes_hash)
-          #OmniAuth.logger.debug("AccessToken#hash_scope? with logic:'#{_logic}', all-scopes:'#{_all_scopes}', scopes-hash:'#{scopes_hash}'")
-          !scopes_hash.is_a?(Hash) && scopes_hash = {'identity'=>scopes_hash}
+        #
+        # def has_scope?(_logic=:'or', _all_scopes=all_scopes, scopes_hash)
+        #   #OmniAuth.logger.debug("AccessToken#hash_scope? with logic:'#{_logic}', all-scopes:'#{_all_scopes}', scopes-hash:'#{scopes_hash}'")
+        #   !scopes_hash.is_a?(Hash) && scopes_hash = {'identity'=>scopes_hash}
+        #   logic = case
+        #     when _logic.to_s.downcase == 'or'; :'any?'
+        #     when _logic.to_s.downcase == 'and'; :'all?'
+        #     else :'any?'
+        #   end
+        #   _all_scopes ||= all_scopes
+        #   scopes_hash.send(logic) do |section, scopes|
+        #     test_scopes = case
+        #       when scopes.is_a?(String); scopes.split(/[, ]/)
+        #       when scopes.is_a?(Array); scopes
+        #       else raise "Scope must be a string or array"
+        #     end
+        #     puts "TESTING _all_scopes: #{_all_scopes.to_yaml}"
+        #     test_scopes.send(logic) do |scope|
+        #       puts "TESTING section: #{section.to_s}, scope: #{scope}"
+        #       _all_scopes[section.to_s].to_a.include?(scope.to_s)
+        #     end
+        #   end
+        # end
+        def has_scope?(scope_query, **opts)          
+          base_scopes = opts[:base_scopes] || all_scopes
+          
           logic = case
-            when _logic.to_s.downcase == 'or'; :'any?'
-            when _logic.to_s.downcase == 'and'; :'all?'
+            when opts[:logic].to_s.downcase == 'or'; :'any?'
+            when opts[:logic].to_s.downcase == 'and'; :'all?'
             else :'any?'
           end
-          _all_scopes ||= all_scopes
-          scopes_hash.send(logic) do |section, scopes|
+
+          scope_query.send(logic) do |section, scopes|
             test_scopes = case
               when scopes.is_a?(String); scopes.split(/[, ]/)
               when scopes.is_a?(Array); scopes
               else raise "Scope must be a string or array"
             end
+            #puts "TESTING with base_scopes: #{base_scopes.to_yaml}"
+            
             test_scopes.send(logic) do |scope|
-              _all_scopes[section.to_s].to_a.include?(scope.to_s)
+              #puts "TESTING section: #{section.to_s}, scope: #{scope}"
+              base_scopes[section.to_s].to_a.include?(scope.to_s)
             end
           end
         end

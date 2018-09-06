@@ -219,7 +219,7 @@ module OmniAuth
       end
 
       def identity
-        return {} unless !skip_info? && has_scope?(identity: ['identity.basic','identity:read:user']) && is_not_excluded?
+        return {} unless !skip_info? && has_scope?(classic:'identity.basic', identity:'identity:read:user') && is_not_excluded?
         semaphore.synchronize {
           @identity ||= access_token.get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
         }
@@ -331,21 +331,21 @@ module OmniAuth
       end
 
       def user_info
-        return {} unless !skip_info? && has_scope?(identity: 'users:read', team: 'users:read') && is_not_excluded?
+        return {} unless !skip_info? && has_scope?(classic:'users:read', team:'users:read') && is_not_excluded?
         semaphore.synchronize {
           @user_info ||= access_token.get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
         }
       end
       
       def user_profile
-        return {} unless !skip_info? && has_scope?(identity: 'users.profile:read', team: 'users.profile:read') && is_not_excluded?
+        return {} unless !skip_info? && has_scope?(classic:'users.profile:read', team:'users.profile:read') && is_not_excluded?
         semaphore.synchronize {
           @user_profile ||= access_token.get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
         }
       end
 
       def team_info
-        return {} unless !skip_info? && has_scope?(identity: 'team:read', team: 'team:read') && is_not_excluded?
+        return {} unless !skip_info? && has_scope?(classic:'team:read', team:'team:read') && is_not_excluded?
         semaphore.synchronize {
           @team_info ||= access_token.get('/api/team.info').parsed
         }
@@ -357,7 +357,7 @@ module OmniAuth
       end
       
       def bot_info
-        return {} unless !skip_info? && has_scope?(identity: 'users:read') && is_not_excluded?
+        return {} unless !skip_info? && has_scope?(classic:'users:read', team:'users:read') && is_not_excluded?
         semaphore.synchronize {
           @bot_info ||= access_token.get('/api/bots.info').parsed
         }
@@ -403,10 +403,13 @@ module OmniAuth
       # This returns hash of workspace scopes, with classic & new identity scopes in :identity.
       # Lists of scopes are in array form.
       def all_scopes
-        @all_scopes ||= auth.to_h['scope'] || access_token.all_scopes
         # @all_scopes ||=
         # {'identity' => (auth['scope'] || apps_permissions_users_list[user_id].to_h['scopes'].to_a.join(',')).to_s.split(',')}
         # .merge(auth['scopes'].to_h)
+        
+        #@all_scopes ||= auth.to_h['scope'] || access_token.all_scopes
+        
+        access_token.all_scopes
       end
       
       # Determine if given scopes exist in current authorization.
@@ -414,8 +417,7 @@ module OmniAuth
       #   key == scope type <identity|app_home|team|channel|group|mpim|im>
       #   val == array or string of individual scopes.
       # TODO: Something not working here since and/or option was built.
-      def has_scope?(logic=:'or', scopes_hash)
-        access_token.has_scope?(logic, all_scopes, scopes_hash)
+      def has_scope?(scope_query, **opts)
         # scopes_hash = args.last.is_a?(Hash) ? args.pop : {}
         # logic = case
         #   when args[0].to_s.downcase == 'or'; :detect
@@ -432,6 +434,10 @@ module OmniAuth
         #     all_scopes[section.to_s].to_a.include?(scope.to_s)
         #   end
         # end
+        
+        #access_token.has_scope?(logic, all_scopes, scopes_hash)
+        
+        access_token.has_scope?(scope_query, **opts)
       end
       
     end
