@@ -181,26 +181,34 @@ module OmniAuth
       #
       def client
         new_client = super
-        log(:debug, "Strategy #{self} using Client #{new_client}")
+        new_client.extend OmniAuth::Slack::Helpers::Client
+        
+        # Disable client errors - accept failed requests & responses.
+        #new_client.options[:raise_errors] = false
         
         # Set client#site with custom team_domain, if exists.
-        team_domain = request.params['team_domain'] || options[:team_domain]
-        if !team_domain.to_s.empty?
-          site_uri = URI.parse(options[:client_options]['site'])
-          site_uri.host = "#{team_domain}.slack.com"
-          new_client.site = site_uri.to_s
-          log(:debug, "Oauth site uri with custom team_domain #{site_uri}")
-        end
+        # team_domain = request.params['team_domain'] || options[:team_domain]
+        # if !team_domain.to_s.empty?
+        #   site_uri = URI.parse(options[:client_options]['site'])
+        #   site_uri.host = "#{team_domain}.slack.com"
+        #   new_client.site = site_uri.to_s
+        #   log(:debug, "Oauth site uri with custom team_domain #{site_uri}")
+        # end
+        new_client.subdomain = request.params['team_domain'] || options[:team_domain]
         
         # Log all client API requests and store raw responses in raw_info hash
-        st_raw_info = raw_info
-        new_client.define_singleton_method(:request) do |*args|
-          OmniAuth.logger.send(:debug, "(slack) API request #{args[0..1]}")  #; by Client #{self}; in thread #{Thread.current.object_id}.")
-          request_output = super(*args)
-          uri = args[1].to_s.gsub(/^.*\/([^\/]+)/, '\1') # use single-quote or double-back-slash for replacement.
-          st_raw_info[uri.to_s]= request_output
-          request_output
-        end
+        # st_raw_info = raw_info
+        # new_client.define_singleton_method(:request) do |*args|
+        #   OmniAuth.logger.send(:debug, "(slack) API request #{args[0..1]}")  #; by Client #{self}; in thread #{Thread.current.object_id}.")
+        #   request_output = super(*args)
+        #   uri = args[1].to_s.gsub(/^.*\/([^\/]+)/, '\1') # use single-quote or double-back-slash for replacement.
+        #   st_raw_info[uri.to_s]= request_output
+        #   request_output
+        # end
+        new_client.logger = OmniAuth.logger
+        new_client.history = raw_info
+        
+        log(:debug, "Strategy #{self} using Client #{new_client}")
         
         new_client
       end
@@ -246,6 +254,8 @@ module OmniAuth
           method_list = %w(apps_permissions_users_list identity user_info user_profile team_info bot_info)  #.concat(options[:additional_data].keys)
           if includes.size > 0
             method_list.keep_if {|m| includes.include?(m.to_s) || includes.include?(m.to_s.to_sym)}
+          elsif excludes[0].to_s == 'all'
+            method_list = []
           elsif excludes.size > 0
             method_list.delete_if {|m| excludes.include?(m.to_s) || excludes.include?(m.to_s.to_sym)}
           end
@@ -284,7 +294,6 @@ module OmniAuth
       # Define methods for addional data from :additional_data option
       def define_additional_data
         return if @additional_data_defined
-        @additional_data_defined = 1
         hash = options[:additional_data]
         if !hash.to_h.empty?
           hash.each do |k,v|
@@ -293,6 +302,7 @@ module OmniAuth
               instance_variable_set(:"@#{k}", v.respond_to?(:call) ? v.call(env) : v)
             end
           end
+          @additional_data_defined = 1
         end
       end
       
@@ -393,7 +403,7 @@ module OmniAuth
       # This returns hash of workspace scopes, with classic & new identity scopes in :identity.
       # Lists of scopes are in array form.
       def all_scopes
-        @all_scopes ||= access_token.all_scopes
+        @all_scopes ||= auth.to_h['scope'] || access_token.all_scopes
         # @all_scopes ||=
         # {'identity' => (auth['scope'] || apps_permissions_users_list[user_id].to_h['scopes'].to_a.join(',')).to_s.split(',')}
         # .merge(auth['scopes'].to_h)
@@ -404,8 +414,8 @@ module OmniAuth
       #   key == scope type <identity|app_home|team|channel|group|mpim|im>
       #   val == array or string of individual scopes.
       # TODO: Something not working here since and/or option was built.
-      def has_scope?(*args)
-        access_token.has_scope?(*args)
+      def has_scope?(logic=:'or', scopes_hash)
+        access_token.has_scope?(logic, all_scopes, scopes_hash)
         # scopes_hash = args.last.is_a?(Hash) ? args.pop : {}
         # logic = case
         #   when args[0].to_s.downcase == 'or'; :detect

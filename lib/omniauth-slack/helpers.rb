@@ -1,3 +1,5 @@
+require 'uri'
+
 module OmniAuth
   module Slack
   
@@ -7,6 +9,9 @@ module OmniAuth
         client_key,
         OmniAuth::Strategies::Slack.default_options['client_options'].map{|k,v| [k.to_sym, v]}.to_h
       )
+      
+      client.extend Helpers::Client
+      client.options[:raise_errors] = false
       
       access_token = case
         when token_string_or_hash.is_a?(String)
@@ -20,7 +25,39 @@ module OmniAuth
     end
     
         
-    module Helpers      
+    module Helpers
+      module Client
+        def self.extended(other)
+          other.instance_eval do
+            singleton_class.send :attr_accessor, :logger, :history, :subdomain
+            
+            #options[:raise_errors] = false
+            
+            self.logger = Logger.new(STDOUT)
+            self.history = {}
+          end
+        end
+            
+        def request(*args)
+          logger.send(:debug, "(slack) API request #{args[0..1]}")  #; by Client #{self}; in thread #{Thread.current.object_id}.")
+          request_output = super(*args)
+          uri = args[1].to_s.gsub(/^.*\/([^\/]+)/, '\1') # use single-quote or double-back-slash for replacement.
+          history[uri.to_s] = request_output
+          request_output
+        end
+        
+        def subomain=(sd)
+          if !sd.to_s.empty?
+            site_uri = URI.parse site
+            site_uri.host = "#{sd}.slack.com"
+            self.site = site_uri.to_s
+            logger.send(:debug, "Oauth site uri with custom team_domain #{site_uri}")
+            site
+          end
+        end      
+      end # Client    
+    
+    
       module AccessToken
       
         def self.extended(other)
@@ -65,7 +102,7 @@ module OmniAuth
         end
       
         def apps_permissions_users_list
-          return {}
+          #return {}
           semaphore.synchronize {
             @apps_permissions_users_list ||= (
               get('/api/apps.permissions.users.list')
@@ -92,19 +129,15 @@ module OmniAuth
         # scopes_hash is hash where:
         #   key == scope type <identity|app_home|team|channel|group|mpim|im>
         #   val == array or string of individual scopes.
-        # Test with this:
-        #   at = App.ad_hoc_client
-        #   at.has_scope?(:and, team:'team:read,users.profile:read,users:read,users:read.email') \
-        #   && at.has_scope?(:and, app_home:'chat:write conversations:read')
-        def has_scope?(*args)
-          scopes_hash = args.last.is_a?(Hash) ? args.pop : args[1]
+        def has_scope?(_logic=:'or', _all_scopes=all_scopes, scopes_hash)
+          #OmniAuth.logger.debug("AccessToken#hash_scope? with logic:'#{_logic}', all-scopes:'#{_all_scopes}', scopes-hash:'#{scopes_hash}'")
           !scopes_hash.is_a?(Hash) && scopes_hash = {'identity'=>scopes_hash}
-          #OmniAuth.logger.debug("(Slack) has_scope?(#{scopes_hash})")
           logic = case
-            when args[0].to_s.downcase == 'or'; :'any?'
-            when args[0].to_s.downcase == 'and'; :'all?'
+            when _logic.to_s.downcase == 'or'; :'any?'
+            when _logic.to_s.downcase == 'and'; :'all?'
             else :'any?'
           end
+          _all_scopes ||= all_scopes
           scopes_hash.send(logic) do |section, scopes|
             test_scopes = case
               when scopes.is_a?(String); scopes.split(/[, ]/)
@@ -112,7 +145,7 @@ module OmniAuth
               else raise "Scope must be a string or array"
             end
             test_scopes.send(logic) do |scope|
-              all_scopes[section.to_s].to_a.include?(scope.to_s)
+              _all_scopes[section.to_s].to_a.include?(scope.to_s)
             end
           end
         end
