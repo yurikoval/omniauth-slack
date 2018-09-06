@@ -149,28 +149,6 @@ module OmniAuth
         #   key == scope type <identity|app_home|team|channel|group|mpim|im>
         #   val == array or string of individual scopes.
         #
-        # def has_scope?(_logic=:'or', _all_scopes=all_scopes, scopes_hash)
-        #   #OmniAuth.logger.debug("AccessToken#hash_scope? with logic:'#{_logic}', all-scopes:'#{_all_scopes}', scopes-hash:'#{scopes_hash}'")
-        #   !scopes_hash.is_a?(Hash) && scopes_hash = {'identity'=>scopes_hash}
-        #   logic = case
-        #     when _logic.to_s.downcase == 'or'; :'any?'
-        #     when _logic.to_s.downcase == 'and'; :'all?'
-        #     else :'any?'
-        #   end
-        #   _all_scopes ||= all_scopes
-        #   scopes_hash.send(logic) do |section, scopes|
-        #     test_scopes = case
-        #       when scopes.is_a?(String); scopes.split(/[, ]/)
-        #       when scopes.is_a?(Array); scopes
-        #       else raise "Scope must be a string or array"
-        #     end
-        #     puts "TESTING _all_scopes: #{_all_scopes.to_yaml}"
-        #     test_scopes.send(logic) do |scope|
-        #       puts "TESTING section: #{section.to_s}, scope: #{scope}"
-        #       _all_scopes[section.to_s].to_a.include?(scope.to_s)
-        #     end
-        #   end
-        # end
         def has_scope?(scope_query, **opts)          
           base_scopes = opts[:base_scopes] || all_scopes
           

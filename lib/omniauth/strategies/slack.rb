@@ -34,19 +34,12 @@ module OmniAuth
       # The combination of user ID and team ID, on the other hand, is guaranteed
       # to be globally unique.
       uid { "#{user_id}-#{team_id}" }
-      
-#       credentials do
-#         {scope: (is_app_token? ? all_scopes : auth['scope'])}
-#       end
-      
+
       credentials do
         {
-          token: auth['token'],
-          token_type: auth['token_type'],
-          expires: (auth['expires_in'] || auth['expires_at'] ? true : false),
-          expires_in: auth['expires_in'],
-          expires_at: auth['expires_at'],
-          scope: (is_app_token? ? all_scopes : auth['scope'])
+          token_type: access_token['token_type'],
+          scope: access_token['scope'],
+          scopes: all_scopes
         }
       end
 
@@ -63,12 +56,12 @@ module OmniAuth
       
         # Start with only what we can glean from the authorization response.
         hash = { 
-          name: auth['user'].to_h['name'],
-          email: auth['user'].to_h['email'],
+          name: access_token['user'].to_h['name'],
+          email: access_token['user'].to_h['email'],
           user_id: user_id,
-          team_name: auth['team_name'] || auth['team'].to_h['name'],
+          team_name: access_token['team_name'] || access_token['team'].to_h['name'],
           team_id: team_id,
-          image: auth['team'].to_h['image_48']
+          image: access_token['team'].to_h['image_48']
         }
 
         # Now add everything else, using further calls to the api, if necessary.
@@ -109,12 +102,12 @@ module OmniAuth
               team_info['team'].to_h['name']
               ),
             team_domain:(
-              auth['team'].to_h['domain'] ||
+              access_token['team'].to_h['domain'] ||
               team_identity.to_h['domain'] ||
               team_info['team'].to_h['domain']
               ),
             team_image:(
-              auth['team'].to_h['image_44'] ||
+              access_token['team'].to_h['image_44'] ||
               team_identity.to_h['image_44'] ||
               team_info['team'].to_h['icon'].to_h['image_44']
               ),
@@ -123,7 +116,7 @@ module OmniAuth
               ),
             nickname:(
               user_info.to_h['user'].to_h['name'] ||
-              auth['user'].to_h['name'] ||
+              access_token['user'].to_h['name'] ||
               user_identity.to_h['name']
               ),
           }
@@ -138,8 +131,8 @@ module OmniAuth
           scopes_requested: (env['omniauth.params'] && env['omniauth.params']['scope']) || \
             (env['omniauth.strategy'] && env['omniauth.strategy'].options && env['omniauth.strategy'].options.scope),
           web_hook_info: web_hook_info,
-          bot_info: auth['bot'] || bot_info['bot'],
-          auth: auth,
+          bot_info: access_token['bot'] || bot_info['bot'],
+          access_token_hash: access_token.to_hash,
           identity: identity,
           user_info: user_info,
           user_profile: user_profile,
@@ -187,24 +180,9 @@ module OmniAuth
         #new_client.options[:raise_errors] = false
         
         # Set client#site with custom team_domain, if exists.
-        # team_domain = request.params['team_domain'] || options[:team_domain]
-        # if !team_domain.to_s.empty?
-        #   site_uri = URI.parse(options[:client_options]['site'])
-        #   site_uri.host = "#{team_domain}.slack.com"
-        #   new_client.site = site_uri.to_s
-        #   log(:debug, "Oauth site uri with custom team_domain #{site_uri}")
-        # end
         new_client.subdomain = request.params['team_domain'] || options[:team_domain]
         
         # Log all client API requests and store raw responses in raw_info hash
-        # st_raw_info = raw_info
-        # new_client.define_singleton_method(:request) do |*args|
-        #   OmniAuth.logger.send(:debug, "(slack) API request #{args[0..1]}")  #; by Client #{self}; in thread #{Thread.current.object_id}.")
-        #   request_output = super(*args)
-        #   uri = args[1].to_s.gsub(/^.*\/([^\/]+)/, '\1') # use single-quote or double-back-slash for replacement.
-        #   st_raw_info[uri.to_s]= request_output
-        #   request_output
-        # end
         new_client.logger = OmniAuth.logger
         new_client.history = raw_info
         
@@ -316,11 +294,6 @@ module OmniAuth
           end
         end
       end
-      
-      # Parsed data returned from /slack/oauth.access api call.
-      def auth
-        @auth ||= access_token.params.to_h.merge({'token' => access_token.token})
-      end
 
       def user_identity
         @user_identity ||= identity['user'].to_h
@@ -352,8 +325,8 @@ module OmniAuth
       end
 
       def web_hook_info
-        return {} unless auth.key? 'incoming_webhook'
-        auth['incoming_webhook']
+        #return {} unless access_token.key? 'incoming_webhook'
+        access_token['incoming_webhook']
       end
       
       def bot_info
@@ -364,11 +337,11 @@ module OmniAuth
       end
       
       def user_id
-        auth['user_id'] || auth['user'].to_h['id'] || auth['authorizing_user'].to_h['user_id']
+        access_token['user_id'] || access_token['user'].to_h['id'] || access_token['authorizing_user'].to_h['user_id']
       end
       
       def team_id
-        auth['team_id'] || auth['team'].to_h['id']
+        access_token['team_id'] || access_token['team'].to_h['id']
       end
       
       # API call to get user permissions for workspace token.
@@ -380,7 +353,6 @@ module OmniAuth
         return {} unless !skip_info? && is_app_token? && is_not_excluded?
         semaphore.synchronize {
           @apps_permissions_users_list ||= access_token.apps_permissions_users_list
-          #@apps_permissions_users_list ||= access_token.get('/api/apps.permissions.users.list').parsed['resources'].inject({}){|h,i| h[i['id']] = i; h}
         }
       end
       
@@ -391,7 +363,6 @@ module OmniAuth
       
       # Is this a workspace app token?
       def is_app_token?
-        #auth['token_type'].to_s == 'app'
         access_token.is_app_token?
       end
       
@@ -403,12 +374,6 @@ module OmniAuth
       # This returns hash of workspace scopes, with classic & new identity scopes in :identity.
       # Lists of scopes are in array form.
       def all_scopes
-        # @all_scopes ||=
-        # {'identity' => (auth['scope'] || apps_permissions_users_list[user_id].to_h['scopes'].to_a.join(',')).to_s.split(',')}
-        # .merge(auth['scopes'].to_h)
-        
-        #@all_scopes ||= auth.to_h['scope'] || access_token.all_scopes
-        
         access_token.all_scopes
       end
       
@@ -418,25 +383,6 @@ module OmniAuth
       #   val == array or string of individual scopes.
       # TODO: Something not working here since and/or option was built.
       def has_scope?(scope_query, **opts)
-        # scopes_hash = args.last.is_a?(Hash) ? args.pop : {}
-        # logic = case
-        #   when args[0].to_s.downcase == 'or'; :detect
-        #   when args[0].to_s.downcase == 'and'; :all?
-        #   else :detect
-        # end
-        # scopes_hash.send(logic) do |section, scopes|
-        #   test_scopes = case
-        #     when scopes.is_a?(String); scopes.split(',')
-        #     when scopes.is_a?(Array); scopes
-        #     else raise "Scope must be a string or array"
-        #   end
-        #   test_scopes.send(logic) do |scope|
-        #     all_scopes[section.to_s].to_a.include?(scope.to_s)
-        #   end
-        # end
-        
-        #access_token.has_scope?(logic, all_scopes, scopes_hash)
-        
         access_token.has_scope?(scope_query, **opts)
       end
       
