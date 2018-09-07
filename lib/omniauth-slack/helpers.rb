@@ -103,12 +103,17 @@ module OmniAuth
           end
         end
       
-        def apps_permissions_users_list
+        def apps_permissions_users_list(user=nil)
           return {} unless is_app_token?
           semaphore.synchronize {
             @apps_permissions_users_list ||= (
-              get('/api/apps.permissions.users.list')
-            ).parsed['resources'].to_h.inject({}){|h,i| h[i['id']] = i; h} || {}
+              r = get('/api/apps.permissions.users.list').parsed
+              r['resources'].to_a.inject({}){|h,i| h[i['id']] = i; h} || {}
+            )
+            # puts "APUL:"
+            # puts @apps_permissions_users_list.to_yaml
+            # puts ''
+            user ? @apps_permissions_users_list[user].to_h['scopes'] : @apps_permissions_users_list
           }
         end
         
@@ -116,8 +121,9 @@ module OmniAuth
           return {} unless is_app_token?
             semaphore.synchronize {
             @apps_permissions_scopes_list ||= (
-              get('/api/apps.permissions.scopes.list')
-            ).parsed['scopes'] || {}
+              r = get('/api/apps.permissions.scopes.list').parsed
+              r['scopes'] || {}
+            )
           }
         end
         
@@ -127,18 +133,30 @@ module OmniAuth
         #   .merge(params['scopes'] || apps_permissions_scopes_list || {})
         # end
         
-        # This puts all compiled scopes back into params['scopes']
+        # Get all scopes, including apps.permissions.users.list if user_id.
+        # This now puts all compiled scopes back into params['scopes']
+        # def all_scopes(user_id=nil)
+        #   @all_scopes ||= (
+        #     scopes = case
+        #       when params['scope']
+        #         {'classic' => params['scope'].split(/[, ]/)}
+        #       when params['scopes'].to_h['identity']
+        #         params['scopes']
+        #       when params['scopes']
+        #         {'identity' => apps_permissions_users_list(user_id)}.merge(params['scopes'])
+        #       else
+        #         {'identity' => apps_permissions_users_list(user_id)}.merge(apps_permissions_scopes_list)
+        #     end
+        #     params['scopes'] = scopes
+        #   )
+        # end
         def all_scopes
           @all_scopes ||= (
             scopes = case
               when params['scope']
                 {'classic' => params['scope'].split(/[, ]/)}
-              when params['scopes'].to_h['identity']
-                params['scopes']
               when params['scopes']
-                {'identity' => apps_permissions_users_list}.merge(params['scopes'])
-              else
-                {'identity' => apps_permissions_users_list}.merge(apps_permissions_scopes_list)
+                params['scopes']
             end
             params['scopes'] = scopes
           )
@@ -150,7 +168,14 @@ module OmniAuth
         #   val == array or string of individual scopes.
         #
         def has_scope?(scope_query, **opts)          
-          base_scopes = opts[:base_scopes] || all_scopes
+          base_scopes = opts[:base_scopes] || all_scopes.dup
+          user = opts[:user_id] || user_id
+          if user && scope_query.is_a?(Hash) && scope_query.keys.detect{|k| k.to_s == 'identity'}
+            base_scopes.merge!({'identity' => apps_permissions_users_list(user)})
+            # puts "Base_scopes merged with identity scopes"
+            # puts base_scopes.to_yaml
+            # puts ''
+          end
           
           logic = case
             when opts[:logic].to_s.downcase == 'or'; :'any?'

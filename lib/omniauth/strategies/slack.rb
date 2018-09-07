@@ -349,10 +349,11 @@ module OmniAuth
       # in the :scope field (acknowledged issue in developer preview).
       #
       # Returns [<id>: <resource>]
-      def apps_permissions_users_list
+      def apps_permissions_users_list(user_id=nil)
         return {} unless !skip_info? && is_app_token? && is_not_excluded?
         semaphore.synchronize {
           @apps_permissions_users_list ||= access_token.apps_permissions_users_list
+          user_id ? @apps_permissions_users_list[user_id].to_h['scopes'] : @apps_permissions_users_list
         }
       end
       
