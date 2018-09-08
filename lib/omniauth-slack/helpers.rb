@@ -3,7 +3,8 @@ require 'uri'
 module OmniAuth
   module Slack
   
-    def self.ad_hoc_access_token(client_id, client_key, token_string_or_hash)
+    # Build an access token from access-token-hash or from token-string.
+    def self.get_access_token(client_id, client_key, token_string_or_hash)
       client = ::OAuth2::Client.new(
         client_id,
         client_key,
@@ -40,7 +41,7 @@ module OmniAuth
         end
             
         def request(*args)
-          logger.send(:debug, "(slack) API request #{args[0..1]}")  #; by Client #{self}; in thread #{Thread.current.object_id}.")
+          logger.debug "(slack) API request #{args[0..1]}"  #; by Client #{self}; in thread #{Thread.current.object_id}.")
           request_output = super(*args)
           uri = args[1].to_s.gsub(/^.*\/([^\/]+)/, '\1') # use single-quote or double-back-slash for replacement.
           history[uri.to_s] = request_output
@@ -53,7 +54,7 @@ module OmniAuth
             site_uri = URI.parse site
             site_uri.host = "#{sd}.slack.com"
             self.site = site_uri.to_s
-            logger.send(:debug, "Oauth site uri with custom team_domain #{site_uri}")
+            logger.debug "Oauth site uri with custom team_domain #{site_uri}"
             site
           end
         end

@@ -248,7 +248,7 @@ module OmniAuth
           Thread.new do
             begin
               while x = work_q.pop(true)
-                log :debug, "Preloading #{x}."
+                log :debug, "Preloading #{x} in thread #{Thread.current.object_id}."
                 send x
               end
             rescue ThreadError
@@ -332,6 +332,10 @@ module OmniAuth
       def team_id
         access_token['team_id'] || access_token['team'].to_h['id']
       end
+
+      def raw_info
+        @raw_info ||= {}
+      end
       
       # API call to get user permissions for workspace token.
       # This is needed because workspace token 'sign-in-with-slack' is missing scopes
@@ -345,11 +349,6 @@ module OmniAuth
         #   user_id ? @apps_permissions_users_list[user_id].to_h['scopes'] : @apps_permissions_users_list
         # }
         access_token.apps_permissions_users_list(user)
-      end
-      
-      # TODO: Why is this here? Does it break existing 'raw_info'?
-      def raw_info
-        @raw_info ||= {}
       end
       
       def scopes_requested
