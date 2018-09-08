@@ -7,9 +7,13 @@ module OmniAuth
   module Strategies
     
     class Slack < OmniAuth::Strategies::OAuth2
+    
       option :name, 'slack'
-
       option :authorize_options, [:scope, :team, :team_domain, :redirect_uri]
+      option :preload_data_with_threads, 0
+      option :include_data, []
+      option :exclude_data, []
+      option :additional_data, {}
 
       option :client_options, {
         site: 'https://slack.com',
@@ -21,14 +25,6 @@ module OmniAuth
         mode: :query,
         param_name: 'token'
       }
-      
-      option :preload_data_with_threads, 0
-      
-      option :include_data, []
-      
-      option :exclude_data, []
-      
-      option :additional_data, {}
       
       # User ID is not guaranteed to be globally unique across all Slack users.
       # The combination of user ID and team ID, on the other hand, is guaranteed
@@ -43,13 +39,8 @@ module OmniAuth
         }
       end
 
-      info do
-      
-        # TODO: Was this necessary? Should it be in auth_hash method?
-        #semaphore unless skip_info?
-        
+      info do        
         num_threads = options.preload_data_with_threads.to_i
-        
         if num_threads > 0 && !skip_info?
           preload_data_with_threads(num_threads)
         end
@@ -124,7 +115,7 @@ module OmniAuth
           hash.merge!(more_info)
         end
         hash
-      end
+      end # info
 
       extra do
         {
@@ -142,6 +133,7 @@ module OmniAuth
           raw_info: @raw_info
         }
       end
+
       
       # Extend AccessToken instance with helpers.
       def access_token(*args)
@@ -177,14 +169,10 @@ module OmniAuth
         new_client = super
         new_client.extend OmniAuth::Slack::Helpers::Client
         
-        # Disable client errors - accept failed requests & responses.
-        #new_client.options[:raise_errors] = false
-        
         # Set client#site with custom team_domain, if exists.
         new_client.subdomain = request.params['team_domain'] || options[:team_domain]
         
-        # Log all client API requests and store raw responses in raw_info hash
-        new_client.logger = OmniAuth.logger
+        # Put the raw_info in a place where the Client will update it for each API request.
         new_client.history = raw_info
         
         log(:debug, "Strategy #{self} using Client #{new_client}")
@@ -196,18 +184,18 @@ module OmniAuth
       def callback_url
         full_host + script_name + callback_path
       end
-
-      def identity
-        return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'identity.basic', identity:'identity:read:user')
+      
+      def user_info
+        return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'users:read', team:'users:read')
         semaphore.synchronize {
-          @identity ||= access_token.get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
+          @user_info ||= access_token.get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
         }
       end
       
-      def scopes_requested
-        (env['omniauth.params'] && env['omniauth.params']['scope']) || options.scope
+      def auth_hash
+        define_additional_data unless skip_info?
+        super
       end
-        
       
       
       private
@@ -216,11 +204,6 @@ module OmniAuth
         super
         @main_semaphore = Mutex.new
         @semaphores = {}
-      end
-      
-      def auth_hash
-        define_additional_data unless skip_info?
-        super
       end
       
       # Get a mutex specific to the calling method.
@@ -300,6 +283,13 @@ module OmniAuth
           end
         end
       end
+      
+      def identity
+        return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'identity.basic', identity:'identity:read:user')
+        semaphore.synchronize {
+          @identity ||= access_token.get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
+        }
+      end
 
       def user_identity
         @user_identity ||= identity['user'].to_h
@@ -307,13 +297,6 @@ module OmniAuth
 
       def team_identity
         @team_identity ||= identity['team'].to_h
-      end
-
-      def user_info
-        return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'users:read', team:'users:read')
-        semaphore.synchronize {
-          @user_info ||= access_token.get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
-        }
       end
       
       def user_profile
@@ -355,17 +338,22 @@ module OmniAuth
       # in the :scope field (acknowledged issue in developer preview).
       #
       # Returns [<id>: <resource>]
-      def apps_permissions_users_list(user_id=nil)
+      def apps_permissions_users_list(user=nil)
         return {} unless !skip_info? && is_not_excluded? && is_app_token?
-        semaphore.synchronize {
-          @apps_permissions_users_list ||= access_token.apps_permissions_users_list
-          user_id ? @apps_permissions_users_list[user_id].to_h['scopes'] : @apps_permissions_users_list
-        }
+        # semaphore.synchronize {
+        #   @apps_permissions_users_list ||= access_token.apps_permissions_users_list
+        #   user_id ? @apps_permissions_users_list[user_id].to_h['scopes'] : @apps_permissions_users_list
+        # }
+        access_token.apps_permissions_users_list(user)
       end
       
       # TODO: Why is this here? Does it break existing 'raw_info'?
       def raw_info
         @raw_info ||= {}
+      end
+      
+      def scopes_requested
+        (env['omniauth.params'] && env['omniauth.params']['scope']) || options.scope
       end
       
       # Is this a workspace app token?
