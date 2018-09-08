@@ -44,6 +44,7 @@ module OmniAuth
           request_output = super(*args)
           uri = args[1].to_s.gsub(/^.*\/([^\/]+)/, '\1') # use single-quote or double-back-slash for replacement.
           history[uri.to_s] = request_output
+          #logger.send(:debug, "(slack) API response (#{args[0..1]}) #{request_output.parsed}")
           request_output
         end
         
@@ -150,16 +151,24 @@ module OmniAuth
         #     params['scopes'] = scopes
         #   )
         # end
-        def all_scopes
-          @all_scopes ||= (
-            scopes = case
-              when params['scope']
-                {'classic' => params['scope'].split(/[, ]/)}
-              when params['scopes']
-                params['scopes']
-            end
-            params['scopes'] = scopes
-          )
+        def all_scopes(user_id=nil)
+          if user_id && !@all_scopes.to_h.has_key?('identity') || @all_scopes.nil?
+            @all_scopes = (
+              scopes = case
+                when params['scope']
+                  {'classic' => params['scope'].split(/[, ]/)}
+                when params['scopes']
+                  params['scopes']
+                else
+                  apps_permissions_scopes_list
+              end
+              
+              scopes['identity'] = apps_permissions_users_list(user_id) if user_id
+              params['scopes'] = scopes
+            )
+          else
+            @all_scopes
+          end
         end
       
         # Determine if given scopes exist in current authorization.
@@ -168,13 +177,24 @@ module OmniAuth
         #   val == array or string of individual scopes.
         #
         def has_scope?(scope_query, **opts)          
-          base_scopes = opts[:base_scopes] || all_scopes.dup
+          # base_scopes = opts[:base_scopes] || all_scopes.dup
+          # user = opts[:user_id] || user_id
+          # if user && scope_query.is_a?(Hash) && scope_query.keys.detect{|k| k.to_s == 'identity'}
+          #   base_scopes.merge!({'identity' => apps_permissions_users_list(user)})
+          #   # puts "Base_scopes merged with identity scopes"
+          #   # puts base_scopes.to_yaml
+          #   # puts ''
+          # end
+          
+          #base_scopes = opts[:base_scopes] || all_scopes.dup
           user = opts[:user_id] || user_id
-          if user && scope_query.is_a?(Hash) && scope_query.keys.detect{|k| k.to_s == 'identity'}
-            base_scopes.merge!({'identity' => apps_permissions_users_list(user)})
-            # puts "Base_scopes merged with identity scopes"
-            # puts base_scopes.to_yaml
-            # puts ''
+          base_scopes = case
+          when opts[:base_scopes]
+            opts[:base_scopes]
+          when user && scope_query.is_a?(Hash) && scope_query.keys.detect{|k| k.to_s == 'identity'}
+            all_scopes(user)
+          else
+            all_scopes
           end
           
           logic = case
@@ -193,7 +213,7 @@ module OmniAuth
             
             test_scopes.send(logic) do |scope|
               #puts "TESTING section: #{section.to_s}, scope: #{scope}"
-              base_scopes[section.to_s].to_a.include?(scope.to_s)
+              base_scopes.to_h[section.to_s].to_a.include?(scope.to_s)
             end
           end
         end

@@ -39,7 +39,7 @@ module OmniAuth
         {
           token_type: access_token['token_type'],
           scope: access_token['scope'],
-          scopes: all_scopes
+          scopes: all_scopes #((user_id if scopes_requested.to_s[/identity/]))
         }
       end
 
@@ -128,8 +128,9 @@ module OmniAuth
 
       extra do
         {
-          scopes_requested: (env['omniauth.params'] && env['omniauth.params']['scope']) || \
-            (env['omniauth.strategy'] && env['omniauth.strategy'].options && env['omniauth.strategy'].options.scope),
+          # scopes_requested: (env['omniauth.params'] && env['omniauth.params']['scope']) || \
+          #   (env['omniauth.strategy'] && env['omniauth.strategy'].options && env['omniauth.strategy'].options.scope),
+          scopes_requested: scopes_requested,
           web_hook_info: web_hook_info,
           bot_info: access_token['bot'] || bot_info['bot'],
           access_token_hash: access_token.to_hash,
@@ -197,11 +198,16 @@ module OmniAuth
       end
 
       def identity
-        return {} unless !skip_info? && has_scope?(classic:'identity.basic', identity:'identity:read:user') && is_not_excluded?
+        return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'identity.basic', identity:'identity:read:user')
         semaphore.synchronize {
           @identity ||= access_token.get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
         }
       end
+      
+      def scopes_requested
+        (env['omniauth.params'] && env['omniauth.params']['scope']) || options.scope
+      end
+        
       
       
       private
@@ -304,21 +310,21 @@ module OmniAuth
       end
 
       def user_info
-        return {} unless !skip_info? && has_scope?(classic:'users:read', team:'users:read') && is_not_excluded?
+        return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'users:read', team:'users:read')
         semaphore.synchronize {
           @user_info ||= access_token.get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
         }
       end
       
       def user_profile
-        return {} unless !skip_info? && has_scope?(classic:'users.profile:read', team:'users.profile:read') && is_not_excluded?
+        return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'users.profile:read', team:'users.profile:read')
         semaphore.synchronize {
           @user_profile ||= access_token.get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
         }
       end
 
       def team_info
-        return {} unless !skip_info? && has_scope?(classic:'team:read', team:'team:read') && is_not_excluded?
+        return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'team:read', team:'team:read')
         semaphore.synchronize {
           @team_info ||= access_token.get('/api/team.info').parsed
         }
@@ -330,7 +336,7 @@ module OmniAuth
       end
       
       def bot_info
-        return {} unless !skip_info? && has_scope?(classic:'users:read', team:'users:read') && is_not_excluded?
+        return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'users:read', team:'users:read')
         semaphore.synchronize {
           @bot_info ||= access_token.get('/api/bots.info').parsed
         }
@@ -350,7 +356,7 @@ module OmniAuth
       #
       # Returns [<id>: <resource>]
       def apps_permissions_users_list(user_id=nil)
-        return {} unless !skip_info? && is_app_token? && is_not_excluded?
+        return {} unless !skip_info? && is_not_excluded? && is_app_token?
         semaphore.synchronize {
           @apps_permissions_users_list ||= access_token.apps_permissions_users_list
           user_id ? @apps_permissions_users_list[user_id].to_h['scopes'] : @apps_permissions_users_list
@@ -374,8 +380,8 @@ module OmniAuth
       #
       # This returns hash of workspace scopes, with classic & new identity scopes in :identity.
       # Lists of scopes are in array form.
-      def all_scopes
-        access_token.all_scopes
+      def all_scopes(*args)
+        access_token.all_scopes(*args)
       end
       
       # Determine if given scopes exist in current authorization.
