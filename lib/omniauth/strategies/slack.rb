@@ -41,7 +41,7 @@ module OmniAuth
 
       info do        
         num_threads = options.preload_data_with_threads.to_i
-        if num_threads > 0 && !skip_info?
+        if num_threads > 0  # && !skip_info?
           preload_data_with_threads(num_threads)
         end
       
@@ -193,7 +193,7 @@ module OmniAuth
       end
       
       def auth_hash
-        define_additional_data unless skip_info?
+        define_additional_data #unless skip_info?
         super
       end
       
@@ -274,7 +274,7 @@ module OmniAuth
       end
       
       def get_additional_data
-        if skip_info?
+        if false && skip_info?
           {}
         else
           options[:additional_data].inject({}) do |hash,tupple|
@@ -343,7 +343,7 @@ module OmniAuth
       #
       # Returns [<id>: <resource>]
       def apps_permissions_users_list(user=nil)
-        return {} unless !skip_info? && is_not_excluded? && is_app_token?
+        return {} unless is_not_excluded? && is_app_token?  # && !skip_info?
         # semaphore.synchronize {
         #   @apps_permissions_users_list ||= access_token.apps_permissions_users_list
         #   user_id ? @apps_permissions_users_list[user_id].to_h['scopes'] : @apps_permissions_users_list
