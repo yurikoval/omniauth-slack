@@ -4,7 +4,7 @@ module OmniAuth
   module Slack
   
     # Build an access token from access-token-hash or from token-string.
-    def self.get_access_token(client_id, client_key, token_string_or_hash)
+    def self.build_access_token(client_id, client_key, token_string_or_hash)
       client = ::OAuth2::Client.new(
         client_id,
         client_key,
@@ -78,15 +78,19 @@ module OmniAuth
             @semaphores[method_name] ||= Mutex.new
           }
         end
-      
+
+        %w(user_name user_email team_id team_name team_domain).each do |word|
+          obj, atrb = word.split('_')
+          define_method(word) do
+            params[word] ||
+            params[obj].to_h[atrb]
+          end
+        end
+
         def user_id
+          params['user_id'] ||
           params['authorizing_user'].to_h['user_id'] ||
           params['user'].to_h['id']
-        end
-        
-        def team_id
-          params['team_id'] ||
-          params['team'].to_h['id']
         end
         
         def uid

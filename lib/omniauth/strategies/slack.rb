@@ -326,11 +326,13 @@ module OmniAuth
       end
       
       def user_id
-        access_token['user_id'] || access_token['user'].to_h['id'] || access_token['authorizing_user'].to_h['user_id']
+        # access_token['user_id'] || access_token['user'].to_h['id'] || access_token['authorizing_user'].to_h['user_id']
+        access_token.user_id
       end
       
       def team_id
-        access_token['team_id'] || access_token['team'].to_h['id']
+        # access_token['team_id'] || access_token['team'].to_h['id']
+        access_token.team_id
       end
 
       def raw_info
