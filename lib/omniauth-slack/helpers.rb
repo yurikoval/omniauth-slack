@@ -108,6 +108,11 @@ module OmniAuth
               nil
           end
         end
+        
+        def is_identity_token?
+          params['user_id'] ||
+          params['user'].to_h['id']
+        end
       
         def apps_permissions_users_list(user=nil)
           return {} unless is_app_token?
@@ -188,6 +193,8 @@ module OmniAuth
             end
           end
         end
+        
+        
         
         def refresh!(*args)
           new_token = super
