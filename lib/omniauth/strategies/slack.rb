@@ -1,7 +1,10 @@
 require 'omniauth/strategies/oauth2'
-require 'omniauth-slack/helpers'
+require 'omniauth-slack/refinements'
+require 'omniauth-slack/slack'
 require 'thread'
 require 'uri'
+
+using OmniAuth::Slack::Refinements
 
 module OmniAuth
   module Strategies
@@ -47,12 +50,12 @@ module OmniAuth
       
         # Start with only what we can glean from the authorization response.
         hash = { 
-          name: access_token['user'].to_h['name'],
-          email: access_token['user'].to_h['email'],
+          name: access_token.user_name,
+          email: access_token.user_email,
           user_id: user_id,
-          team_name: access_token['team_name'] || access_token['team'].to_h['name'],
+          team_name: access_token.team_name,
           team_id: team_id,
-          image: access_token['team'].to_h['image_48']
+          image: access_token['team'].to_h['image_34']
         }
 
         # Now add everything else, using further calls to the api, if necessary.
@@ -71,9 +74,9 @@ module OmniAuth
           more_info = {
             image: (
               hash[:image] ||
-              user_identity.to_h['image_48'] ||
-              user_info['user'].to_h['profile'].to_h['image_48'] ||
-              user_profile['profile'].to_h['image_48']
+              user_identity.to_h['image_34'] ||
+              user_info['user'].to_h['profile'].to_h['image_34'] ||
+              user_profile['profile'].to_h['image_34']
               ),
             name:(
               hash[:name] ||
@@ -98,9 +101,9 @@ module OmniAuth
               team_info['team'].to_h['domain']
               ),
             team_image:(
-              access_token['team'].to_h['image_44'] ||
-              team_identity.to_h['image_44'] ||
-              team_info['team'].to_h['icon'].to_h['image_44']
+              access_token['team'].to_h['image_34'] ||
+              team_identity.to_h['image_34'] ||
+              team_info['team'].to_h['icon'].to_h['image_34']
               ),
             team_email_domain:(
               team_info['team'].to_h['email_domain']
@@ -125,26 +128,16 @@ module OmniAuth
           web_hook_info: web_hook_info,
           bot_info: access_token['bot'] || bot_info['bot'],
           access_token_hash: access_token.to_hash,
-          identity: identity,
-          user_info: user_info,
-          user_profile: user_profile,
-          team_info: team_info,
+          identity: @identity,
+          user_info: @user_info,
+          user_profile: @user_profile,
+          team_info: @team_info,
           additional_data: get_additional_data,
           raw_info: @raw_info
         }
       end
 
-      
-      # Extend AccessToken instance with helpers.
-      def access_token(*args)
-        at = super
-        unless at.singleton_class.ancestors.include?(OmniAuth::Slack::Helpers::AccessToken)
-          log(:debug, "Extending #{at} with additional functionality.")
-          at.extend OmniAuth::Slack::Helpers::AccessToken
-        end
-        at
-      end
-      
+
       # Pass on certain authorize_params to the Slack authorization GET request.
       # See https://github.com/omniauth/omniauth/issues/390
       def authorize_params
@@ -167,8 +160,7 @@ module OmniAuth
       #
       def client
         new_client = super
-        new_client.extend OmniAuth::Slack::Helpers::Client
-        
+                
         # Set client#site with custom team_domain, if exists.
         new_client.subdomain = request.params['team_domain'] || options[:team_domain]
         
@@ -285,9 +277,15 @@ module OmniAuth
       end
       
       def identity
-        return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'identity.basic', identity:'identity:read:user')
         semaphore.synchronize {
-          @identity ||= access_token.get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
+          @identity ||= case
+            when (from_access_token = access_token.to_hash.select{|k,v| ['user', 'team'].include?(k.to_s)}) && from_access_token.any?
+              from_access_token
+            when ! (!skip_info? && is_not_excluded? && has_scope?(classic:'identity.basic', identity:'identity:read:user'))
+              {}
+            else
+              access_token.get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
+          end
         }
       end
 
