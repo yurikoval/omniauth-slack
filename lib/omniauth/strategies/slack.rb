@@ -10,10 +10,11 @@ module OmniAuth
   module Strategies
     
     class Slack < OmniAuth::Strategies::OAuth2
-    
+      OPTIONS = %w(scope team team_domain redirect_uri)
+      
       option :name, 'slack'
-      option :authorize_options, %w(scope team team_domain redirect_uri)
-      option :pass_through_params, []  #%w(scope team team_domain redirect_uri)
+      option :authorize_options, OPTIONS - ['team_domain']
+      option :pass_through_params, []  # OPTIONS
       option :preload_data_with_threads, 0
       option :include_data, []
       option :exclude_data, []
@@ -143,8 +144,8 @@ module OmniAuth
       # See https://github.com/omniauth/omniauth/issues/390
       def authorize_params
         super.tap do |params|
-          options[:pass_through_params].to_a.each do |v|
-            if !request.params[v].to_s.empty? && v.to_s != 'team_domain'
+          options[:pass_through_params].to_a.reject{|o| o.to_s == 'team_domain'}.each do |v|
+            if !request.params[v].to_s.empty?
               params[v.to_sym] = request.params[v]
             end
           end
