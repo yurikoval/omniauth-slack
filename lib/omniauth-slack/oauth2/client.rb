@@ -31,15 +31,16 @@ module OmniAuth
           #logger.debug "(slack) API response (#{args[0..1]}) #{request_output.parsed}"
           request_output
         end
-        
+
         # Set custom subdomain for oauth.access calls.
-        def subomain=(sd)
-          if !sd.to_s.empty?
-            site_uri = URI.parse site
-            site_uri.host = "#{sd}.slack.com"
-            self.site = site_uri.to_s
+        def site(*args)
+          if !@subdomain.to_s.empty?
+            site_uri = URI.parse(super)
+            site_uri.host = "#{@subdomain}.#{site_uri.host}"
             logger.debug "(slack) Oauth site uri with custom team_domain #{site_uri}"
-            site
+            site_uri
+          else
+            super
           end
         end
         

@@ -12,7 +12,8 @@ module OmniAuth
     class Slack < OmniAuth::Strategies::OAuth2
     
       option :name, 'slack'
-      option :authorize_options, [:scope, :team, :team_domain, :redirect_uri]
+      option :authorize_options, %w(scope team team_domain redirect_uri)
+      option :pass_through_params, []  #%w(scope team team_domain redirect_uri)
       option :preload_data_with_threads, 0
       option :include_data, []
       option :exclude_data, []
@@ -142,8 +143,8 @@ module OmniAuth
       # See https://github.com/omniauth/omniauth/issues/390
       def authorize_params
         super.tap do |params|
-          %w(scope team redirect_uri).each do |v|
-            if !request.params[v].to_s.empty?
+          options[:pass_through_params].to_a.each do |v|
+            if !request.params[v].to_s.empty? && v.to_s != 'team_domain'
               params[v.to_sym] = request.params[v]
             end
           end
@@ -161,8 +162,8 @@ module OmniAuth
       def client
         new_client = super
                 
-        # Set client#site with custom team_domain, if exists.
-        new_client.subdomain = request.params['team_domain'] || options[:team_domain]
+        # Set client#subdomain with custom team_domain, if exists and allowed.
+        new_client.subdomain = (options[:pass_through_params].include?('team_domain') && request.params['team_domain']) ? request.params['team_domain'] : options[:team_domain]
         
         # Put the raw_info in a place where the Client will update it for each API request.
         new_client.history = raw_info
