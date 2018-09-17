@@ -135,15 +135,9 @@ module OmniAuth
               base_scopes.to_h[section.to_s].to_a.include?(scope.to_s)
             end
           end
-        end
-        
-#         def refresh!(*args)
-#           new_token = super
-#           new_token.extend Helpers::AccessToken
-#           new_token
-#         end        
+        end   
 
-      end
+      end # AccessToken
     end
   end
 end

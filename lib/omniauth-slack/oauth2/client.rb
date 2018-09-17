@@ -32,7 +32,7 @@ module OmniAuth
           request_output
         end
 
-        # Set custom subdomain for oauth.access calls.
+        # Use custom subdomain for oauth.access calls.
         def site(*args)
           if !@subdomain.to_s.empty?
             site_uri = URI.parse(super)
