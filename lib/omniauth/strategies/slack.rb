@@ -10,11 +10,11 @@ module OmniAuth
   module Strategies
     
     class Slack < OmniAuth::Strategies::OAuth2
-      OPTIONS = %w(scope team team_domain redirect_uri)
+      AUTH_OPTIONS = %w(scope team team_domain redirect_uri)
       
       option :name, 'slack'
-      option :authorize_options, OPTIONS - ['team_domain']
-      option :pass_through_params, []  # OPTIONS
+      option :authorize_options, AUTH_OPTIONS - ['team_domain']
+      option :pass_through_params, []  # AUTH_OPTIONS
       option :preload_data_with_threads, 0
       option :include_data, []
       option :exclude_data, []
@@ -40,7 +40,7 @@ module OmniAuth
         {
           token_type: access_token['token_type'],
           scope: access_token['scope'],
-          scopes: all_scopes #((user_id if scopes_requested.to_s[/identity/]))
+          scopes: all_scopes
         }
       end
 
@@ -143,14 +143,22 @@ module OmniAuth
       # Pass on certain authorize_params to the Slack authorization GET request.
       # See https://github.com/omniauth/omniauth/issues/390
       def authorize_params
-        super.tap do |params|
-          options[:pass_through_params].to_a.reject{|o| o.to_s == 'team_domain'}.each do |v|
-            if !request.params[v].to_s.empty?
-              params[v.to_sym] = request.params[v]
-            end
-          end
-          log(:debug, "Authorize_params #{params.to_h}")
+        super.tap do |aprms|
+          digest = aprms.hash
+          log(:debug, "Using authorize_params #{aprms}")
+          allowed_options = options[:pass_through_params].to_a.reject{|o| o.to_s == 'team_domain'}
+          newprms = request.params.keep_if{|k,v| allowed_options.include?(k.to_s)}
+          aprms.merge!(newprms)
+          aprms.delete_if{|k,v| v.to_s.empty?}
+          log(:debug, "Modified authorize_params #{aprms}") if aprms.hash != digest
+          session['omniauth.authorize_params'] = aprms
         end
+      end
+      
+      def callback_phase(*args)
+        rslt = super
+        session.delete('omniauth.authorize_params')
+        rslt
       end
       
       # Get a new OAuth2::Client and define custom behavior.
@@ -354,7 +362,13 @@ module OmniAuth
       end
       
       def scopes_requested
-        (env['omniauth.params'] && env['omniauth.params']['scope']) || options.scope
+        #(env['omniauth.params'] && env['omniauth.params']['scope']) || options.scope
+        
+        # (env['omniauth.authorize_params'].to_h['scope']) ||
+        # #(env['omniauth.params'] && env['omniauth.params']['scope']) ||
+        # options.scope
+
+        session['omniauth.authorize_params'].to_h['scope']
       end
       
       # Is this a workspace app token?
