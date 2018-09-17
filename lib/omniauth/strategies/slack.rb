@@ -14,7 +14,7 @@ module OmniAuth
       
       option :name, 'slack'
       option :authorize_options, AUTH_OPTIONS - ['team_domain']
-      option :pass_through_params, []  # AUTH_OPTIONS
+      option :pass_through_params, AUTH_OPTIONS
       option :preload_data_with_threads, 0
       option :include_data, []
       option :exclude_data, []
@@ -146,7 +146,7 @@ module OmniAuth
         super.tap do |aprms|
           digest = aprms.hash
           log(:debug, "Using authorize_params #{aprms}")
-          allowed_options = options[:pass_through_params].to_a.reject{|o| o.to_s == 'team_domain'}
+          allowed_options = options.pass_through_params.to_a.reject{|o| o.to_s == 'team_domain'}
           newprms = request.params.keep_if{|k,v| allowed_options.include?(k.to_s)}
           aprms.merge!(newprms)
           aprms.delete_if{|k,v| v.to_s.empty?}
@@ -172,7 +172,7 @@ module OmniAuth
         new_client = super
                 
         # Set client#subdomain with custom team_domain, if exists and allowed.
-        new_client.subdomain = (options[:pass_through_params].include?('team_domain') && request.params['team_domain']) ? request.params['team_domain'] : options[:team_domain]
+        new_client.subdomain = (options.pass_through_params.to_a.include?('team_domain') && request.params['team_domain']) ? request.params['team_domain'] : options.team_domain
         
         # Put the raw_info in a place where the Client will update it for each API request.
         new_client.history = raw_info
@@ -242,7 +242,7 @@ module OmniAuth
       def preload_data_with_threads(num_threads)
         return unless num_threads > 0 && !@preloaded_data
         @preloaded_data = 1
-        preload_methods = active_methods + options[:additional_data].keys
+        preload_methods = active_methods + options.additional_data.to_h.keys
         log :info, "Preloading (#{preload_methods.size}) data requests using (#{num_threads}) threads."
         work_q = Queue.new
         preload_methods.each{|x| work_q.push x }
@@ -263,7 +263,7 @@ module OmniAuth
       # Define methods for addional data from :additional_data option
       def define_additional_data
         return if @additional_data_defined
-        hash = options[:additional_data]
+        hash = options.additional_data
         if !hash.to_h.empty?
           hash.each do |k,v|
             define_singleton_method(k) do
@@ -279,7 +279,7 @@ module OmniAuth
         if false && skip_info?
           {}
         else
-          options[:additional_data].inject({}) do |hash,tupple|
+          options.additional_data.to_h.inject({}) do |hash,tupple|
             hash[tupple[0].to_s] = send(tupple[0].to_s)
             hash
           end

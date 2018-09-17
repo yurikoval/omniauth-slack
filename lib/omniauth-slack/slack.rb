@@ -15,7 +15,7 @@ module OmniAuth
       client = OAuth2::Client.new(
         client_id,
         client_key,
-        OmniAuth::Strategies::Slack.default_options['client_options'].map{|k,v| [k.to_sym, v]}.to_h
+        OmniAuth::Strategies::Slack.default_options.client_options.to_h.map{|k,v| [k.to_sym, v]}.to_h
       )
       
       #client.extend Helpers::Client
