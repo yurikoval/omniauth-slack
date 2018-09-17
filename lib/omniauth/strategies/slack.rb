@@ -143,15 +143,24 @@ module OmniAuth
       # Pass on certain authorize_params to the Slack authorization GET request.
       # See https://github.com/omniauth/omniauth/issues/390
       def authorize_params
-        super.tap do |aprms|
-          digest = aprms.hash
-          log(:debug, "Using authorize_params #{aprms}")
-          allowed_options = options.pass_through_params.to_a.reject{|o| o.to_s == 'team_domain'}
-          newprms = request.params.keep_if{|k,v| allowed_options.include?(k.to_s)}
-          aprms.merge!(newprms)
-          aprms.delete_if{|k,v| v.to_s.empty?}
-          log(:debug, "Modified authorize_params #{aprms}") if aprms.hash != digest
-          session['omniauth.authorize_params'] = aprms
+        # super.tap do |aprms|
+        #   digest = aprms.hash
+        #   log(:debug, "Using authorize_params #{aprms}")
+        #   allowed_options = options.pass_through_params.to_a.reject{|o| o.to_s == 'team_domain'}
+        #   newprms = request.params.keep_if{|k,v| allowed_options.include?(k.to_s)}
+        #   aprms.merge!(newprms)
+        #   aprms.delete_if{|k,v| v.to_s.empty?}
+        #   log(:debug, "Modified authorize_params #{aprms}") if aprms.hash != digest
+        #   session['omniauth.authorize_params'] = aprms
+        # end
+        #
+        # This is the same as above but more compact. More readable? Or worse?
+        super.tap do |prms|
+          digest = prms.hash
+          log(:debug, "Using authorize_params #{prms}")
+          prms.merge!(request.params.keep_if{|k,v| options.pass_through_params.to_a.reject{|o| o.to_s == 'team_domain'}.include?(k.to_s)})
+          log(:debug, "Modified authorize_params #{prms}") if prms.hash != digest
+          session['omniauth.authorize_params'] = prms
         end
       end
       
