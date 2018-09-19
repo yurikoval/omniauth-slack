@@ -10,11 +10,11 @@ module OmniAuth
   module Strategies
     
     class Slack < OmniAuth::Strategies::OAuth2
-      AUTH_OPTIONS = %w(scope team team_domain redirect_uri)
+      AUTH_OPTIONS = %w(redirect_uri scope team team_domain )
       
       option :name, 'slack'
-      option :authorize_options, AUTH_OPTIONS - ['team_domain']
-      option :pass_through_params, AUTH_OPTIONS
+      option :authorize_options, AUTH_OPTIONS - %w(team_domain)
+      option :pass_through_params, []
       option :preload_data_with_threads, 0
       option :include_data, []
       option :exclude_data, []
@@ -146,9 +146,22 @@ module OmniAuth
         super.tap do |prms|
           digest = prms.hash
           log(:debug, "Using authorize_params #{prms}")
-          prms.merge!(request.params.keep_if{|k,v| options.pass_through_params.to_a.reject{|o| o.to_s == 'team_domain'}.include?(k.to_s)})
+          prms.merge!(request.params.keep_if{|k,v| pass_through_params.reject{|o| o.to_s == 'team_domain'}.include?(k.to_s)})
           log(:debug, "Modified authorize_params #{prms}") if prms.hash != digest
           session['omniauth.authorize_params'] = prms
+        end
+      end
+      
+      # Get and decode options[:pass_through_params]. 
+      def pass_through_params
+        ptp = [options.pass_through_params].flatten.compact
+        case
+          when ptp[0].to_s == 'all'
+            options[:pass_through_params] = AUTH_OPTIONS
+          when ptp[0].to_s == 'none'
+            []
+          else
+            ptp
         end
       end
       
@@ -168,7 +181,7 @@ module OmniAuth
         new_client = super
                 
         # Set client#subdomain with custom team_domain, if exists and allowed.
-        new_client.subdomain = (options.pass_through_params.to_a.include?('team_domain') && request.params['team_domain']) ? request.params['team_domain'] : options.team_domain
+        new_client.subdomain = (pass_through_params.include?('team_domain') && request.params['team_domain']) ? request.params['team_domain'] : options.team_domain
         
         # Put the raw_info in a place where the Client will update it for each API request.
         new_client.history = raw_info
@@ -338,7 +351,8 @@ module OmniAuth
         # access_token['team_id'] || access_token['team'].to_h['id']
         access_token.team_id
       end
-
+      
+      # This hash is handed to the access-token, which in turn fills it with API response objects.
       def raw_info
         @raw_info ||= {}
       end
@@ -364,7 +378,7 @@ module OmniAuth
         # #(env['omniauth.params'] && env['omniauth.params']['scope']) ||
         # options.scope
 
-        session['omniauth.authorize_params'].to_h['scope']
+        env['omniauth.authorize_params'].to_h['scope']
       end
       
       # Is this a workspace app token?

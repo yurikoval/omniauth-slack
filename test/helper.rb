@@ -4,6 +4,7 @@ require "mocha/setup"
 require "omniauth/strategies/slack"
 
 OmniAuth.config.test_mode = true
+OmniAuth.logger.level = 1
 
 module BlockTestHelper
   def test(name, &blk)

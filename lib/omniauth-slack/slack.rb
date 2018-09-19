@@ -1,5 +1,5 @@
 require 'uri'
-require 'omniauth/strategies/slack'
+#require 'omniauth/strategies/slack'
 require 'omniauth-slack/oauth2/client'
 require 'omniauth-slack/oauth2/access_token'
 require 'omniauth-slack/refinements'

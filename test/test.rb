@@ -1,8 +1,6 @@
 require 'helper'
 require 'omniauth-slack'
 
-OmniAuth.logger.level = 1
-
 class StrategyTest < StrategyTestCase
   include OAuth2StrategyTests
 end
@@ -25,25 +23,41 @@ class ClientTest < StrategyTestCase
   end
   
   test 'request logs api call' do
-    OAuth2::Client.class_eval do
+    # We need to manually stub the base #request method,
+    # since we're testing the override in the subclassed Client.
+    ::OAuth2::Client.class_eval do
       def request(*args)
-        {simple: 'hash'}
+        {'simple' => 'hash'}
       end
     end
     @client = strategy.client
-    OmniAuth.logger.expects(:send).with(){|*params| assert_equal :debug, params[0]}
-    @client.request(:get, 'http://test-url')
+    OmniAuth.logger.expects(:debug).with(){|*params| assert_match(/http:\/\/host\/api\/test.action/, params[0])}
+    @client.request(:get, 'http://host/api/test.action')
   end
   
   test 'request adds api response to raw_info hash' do
-    OAuth2::Client.class_eval do
+    # We need to manually stub the base #request method,
+    # since we're testing the override in the subclassed Client.
+    ::OAuth2::Client.class_eval do
       def request(*args)
-        {simple: 'hash'}
+        {'simple' => 'hash'}
       end
     end
     @client = strategy.client
-    @client.request(:get, 'http://test-url')
-    assert_equal( {'test-url' => {simple: 'hash'}}, strategy.send(:raw_info) )
+    @client.request(:get, 'http://host/api/test.action')
+    #assert_equal( {'test.action' => {'simple' => 'hash'}}, @client.history )
+    assert_equal( {'test.action' => {'simple' => 'hash'}}, strategy.send(:raw_info) )
+  end
+  
+  test "transfers team_domain from options to client.site uri" do
+    @options = { :team_domain => 'subdomain' }
+    assert_equal "https://subdomain.slack.com", strategy.client.site
+  end
+  
+  test "transfers team_domain from request.params to client.site uri" do
+    @options = {pass_through_params: 'team_domain' }
+    @request.stubs(:params).returns({ 'team_domain' => 'subdomain2' })
+    assert_equal "https://subdomain2.slack.com", strategy.client.site
   end
 end
 
@@ -67,8 +81,10 @@ end
 class UidTest < StrategyTestCase
   def setup
     super
-    #strategy.stubs(:identity).returns("user" => {"id" => "U123"}, "team" => {"id" => "T456"})
-    strategy.stubs(:auth).returns("user" => {"id" => "U123"}, "team" => {"id" => "T456"})
+    @access_token = stub("OmniAuth::Slack::OAuth2::AccessToken")
+    @access_token.stubs(:user_id).returns('U123')
+    @access_token.stubs(:team_id).returns('T456')
+    strategy.stubs(:access_token).returns(@access_token)
   end
 
   test "returns the user ID from user_identity" do
@@ -79,7 +95,7 @@ end
 class CredentialsTest < StrategyTestCase
   def setup
     super
-    @access_token = stub("OAuth2::AccessToken")
+    @access_token = stub("OmniAuth::Slack::OAuth2::AccessToken")
     @access_token.stubs(:token)
     @access_token.stubs(:expires?)
     @access_token.stubs(:expires_at)
@@ -87,6 +103,7 @@ class CredentialsTest < StrategyTestCase
     @access_token.stubs(:[])
     @access_token.stubs(:params)
     @access_token.stubs(:is_app_token?)
+    @access_token.stubs(:all_scopes)
     strategy.stubs(:access_token).returns(@access_token)
   end
 
@@ -135,28 +152,32 @@ class IdentityTest < StrategyTestCase
 
   def setup
     super
-    @access_token = stub("OAuth2::AccessToken")
+    @access_token = stub("OmniAuth::Slack::OAuth2::AccessToken")
     @access_token.stubs(:[])
     @access_token.stubs(:params)
     @access_token.stubs(:token)
+    @access_token.stubs(:to_hash).returns({})
+    @access_token.stubs(:user_id).returns(nil)
     strategy.stubs(:access_token).returns(@access_token)
     strategy.stubs(:has_scope?).returns true
+    strategy.stubs(:is_not_excluded?).returns true
+    strategy.stubs(:skip_info?).returns false
   end
-
+  
+  # There should be 3 of these, one for each condition of the 'case' statement.
   test "performs a GET to https://slack.com/api/users.identity" do
     @access_token.expects(:get).with("/api/users.identity", {:headers => {"X-Slack-User" => nil}})
       .returns(stub_everything("OAuth2::Response"))
-    strategy.identity
+    strategy.send :identity
   end
-
 end
 
 class SkipInfoTest < StrategyTestCase
 
   test 'info should not include extended info when skip_info is specified' do
+    @access_token = stub_everything("OmniAuth::Slack::OAuth2::AccessToken")
     @options = { skip_info: true }
-    #strategy.stubs(:identity).returns({})
-    strategy.stubs(:auth).returns({})
+    strategy.stubs(:access_token).returns(@access_token)
     assert_equal %w(name email user_id team_name team_id image), strategy.info.keys.map(&:to_s)
   end
 
@@ -168,7 +189,8 @@ class AuthorizeParamsTest < StrategyTestCase
     assert_kind_of OmniAuth::Strategy::Options, strategy.authorize_params
   end
   
-  test 'forwards request params (scope, team, redirect_uri) to slack' do
+  test 'forwards oauth request params (redirect_uri scope team) to slack' do
+    @options = {pass_through_params: %w(redirect_uri scope team)}
     strategy.request.params['scope'] = 'test-scope'
     strategy.request.params['team'] = 'test-team'
     strategy.request.params['redirect_uri'] = 'http://my-test-uri/auth/callback'

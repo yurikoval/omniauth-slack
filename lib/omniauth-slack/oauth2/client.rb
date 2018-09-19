@@ -38,7 +38,7 @@ module OmniAuth
             site_uri = URI.parse(super)
             site_uri.host = "#{@subdomain}.#{site_uri.host}"
             logger.debug "(slack) Oauth site uri with custom team_domain #{site_uri}"
-            site_uri
+            site_uri.to_s
           else
             super
           end
