@@ -10,6 +10,7 @@ module OmniAuth
   module Strategies
     
     class Slack < OmniAuth::Strategies::OAuth2
+    
       AUTH_OPTIONS = %w(redirect_uri scope team team_domain )
       
       option :name, 'slack'
@@ -138,8 +139,8 @@ module OmniAuth
           raw_info: @raw_info
         }
       end
-
-
+      
+      
       # Pass on certain authorize_params to the Slack authorization GET request.
       # See https://github.com/omniauth/omniauth/issues/390
       def authorize_params
@@ -157,7 +158,7 @@ module OmniAuth
         ptp = [options.pass_through_params].flatten.compact
         case
           when ptp[0].to_s == 'all'
-            options[:pass_through_params] = AUTH_OPTIONS
+            options.pass_through_params = AUTH_OPTIONS
           when ptp[0].to_s == 'none'
             []
           else
