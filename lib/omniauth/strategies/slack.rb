@@ -451,17 +451,17 @@ module OmniAuth
           {source: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
         ]
         
-#       data_method :demo_dsl do
-#         scope({classic:'identity.basic', identity:'identity:read:user'})
-#         storage true
-#         condition proc{ true }
-#         default_value Hash.new
-#         
-#         source 'access_token' do
-#           get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
-#         end
-#       end
-#       
+      data_method :demo_dsl do
+        scope({classic:'identity.basic', identity:'identity:read:user'})
+        storage true
+        condition proc{ true }
+        default_value Hash.new
+        
+        source 'access_token' do
+          get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
+        end
+      end
+      
       @api_methods ||= dependencies_flat
     end # Slack
   end # Strategies

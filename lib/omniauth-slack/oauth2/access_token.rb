@@ -101,6 +101,7 @@ module OmniAuth
         end
       
         # Determine if given scopes exist in current authorization.
+        # This is classic and worspace token compatible (TODO: does this accept all slack token types?).
         # scope_query is a hash where:
         #   key == scope type <app_home|team|channel|group|mpim|im|identity|classic>
         #   val == array or string of individual scopes.
