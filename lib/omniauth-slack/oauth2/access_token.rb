@@ -110,37 +110,49 @@ module OmniAuth
         #     base_scopes
         #     logic
         #
-        def has_scope?(scope_query, **opts)          
+        def has_scope?(scope_query, opts={})
+          opts ||= {}         
           user = opts[:user_id] || user_id
-          base_scopes = case
-            when opts[:base_scopes]
-              opts[:base_scopes]
-            when user && scope_query.is_a?(Hash) && scope_query.keys.detect{|k| k.to_s == 'identity'}
-              all_scopes(user)
-            else
-              all_scopes
-          end
+          scope_query = [scope_query].flatten(1)
           
           logic = case
-            when opts[:logic].to_s.downcase == 'or'; :'any?'
-            when opts[:logic].to_s.downcase == 'and'; :'all?'
-            else :'any?'
+            when opts[:logic].to_s.downcase == 'or'; {outter: 'all?', inner: 'any?'}
+            when opts[:logic].to_s.downcase == 'and'; {outter: 'any?', inner: 'all?'}
+            else {outter: 'all?', inner: 'any?'}
           end
-
-          scope_query.send(logic) do |section, scopes|
-            test_scopes = case
-              when scopes.is_a?(String); scopes.split(/[, ]/)
-              when scopes.is_a?(Array); scopes
-              else raise "Scope must be a string or array"
+          #puts "Scope Logic #{logic.inspect}"
+          
+          scope_query.send(logic[:outter]) do |query|
+            #puts "Outter Scope Query: #{query.inspect}"
+          
+            base_scopes = case
+              when opts[:base_scopes]
+                #puts "Base Scopes: opts[:base_scopes]"
+                opts[:base_scopes]
+              when user && query.is_a?(Hash) && query.keys.detect{|k| k.to_s == 'identity'}
+                #puts "Base Scopes: all_scopes(user)"
+                all_scopes(user)
+              else
+                #puts "Base Scopes: all_scopes"
+                all_scopes
             end
-            #puts "TESTING with base_scopes: #{base_scopes.to_yaml}"
+  
+            query.send(logic[:inner]) do |section, scopes|
+              test_scopes = case
+                when scopes.is_a?(String); scopes.split(/[, ]/)
+                when scopes.is_a?(Array); scopes
+                else raise "Scope must be a string or array"
+              end
+              #puts "TESTING with base_scopes: #{base_scopes.to_yaml}"
+              
+              test_scopes.send(logic[:inner]) do |scope|
+                #puts "TESTING section: #{section.to_s}, scope: #{scope}"
+                base_scopes.to_h[section.to_s].to_a.include?(scope.to_s)
+              end
+            end
             
-            test_scopes.send(logic) do |scope|
-              #puts "TESTING section: #{section.to_s}, scope: #{scope}"
-              base_scopes.to_h[section.to_s].to_a.include?(scope.to_s)
-            end
-          end
-        end   
+          end # scope_query.each
+        end # has_scope?
 
       end # AccessToken
     end

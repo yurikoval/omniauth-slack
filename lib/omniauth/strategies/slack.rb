@@ -412,8 +412,8 @@ module OmniAuth
       #   key == scope type <identity|app_home|team|channel|group|mpim|im>
       #   val == array or string of individual scopes.
       # TODO: Something not working here since and/or option was built.
-      def has_scope?(scope_query, **opts)
-        access_token.has_scope?(scope_query, **opts)
+      def has_scope?(scope_query, opts={})
+        access_token.has_scope?(scope_query, opts)
       end
             
             
@@ -462,7 +462,7 @@ module OmniAuth
         end
       end
       
-      @api_methods ||= dependencies_flat
+      @api_methods.to_a.any? || @api_methods = dependencies_flat
     end # Slack
   end # Strategies
 end # OmniAuth

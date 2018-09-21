@@ -32,7 +32,8 @@ module OmniAuth
         def dependencies
           result = Hashy.new
           data_methods.each do |key, val|
-            result[key] = val.sources.to_a.map{|s| s.source}
+            #puts "DataMethods::Extensions.dependencies, data_methods.each, key '#{key}' val-type '#{val.class}'"
+            result[key] = val.sources.to_a.map{|s| s[:source]}
           end
           result
         end
@@ -74,7 +75,7 @@ module OmniAuth
             semaphore(name).synchronize do
             
               if (
-                (scopes = method_opts[:scopes]) && !has_scope?(*[scopes].flatten(1)) ||
+                (scopes = method_opts[:scopes]) && !has_scope?(scopes, method_opts[:scope_logic]) ||
                 (conditions = method_opts[:conditions]) && !(conditions.is_a?(Proc) ? conditions.call : eval(conditions))
               )
                 log(:debug, "Data method '#{name}' returning from unmet scopes or conditions.")
@@ -114,7 +115,7 @@ module OmniAuth
               end # api_methods.each
               
               result ||= method_opts[:default_value]
-              log(:debug, "Data method '#{name}' returning: #{result}")
+              #log(:debug, "Data method '#{name}' returning: #{result}")
               instance_variable_set(("@#{storage_name}"), result) if result && storage_name
               result
               
