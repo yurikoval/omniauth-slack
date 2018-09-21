@@ -4,6 +4,10 @@ require 'omniauth-slack/slack'
 require 'thread'
 require 'uri'
 
+# Experimental
+require 'omniauth-slack/data_methods'
+
+
 using OmniAuth::Slack::Refinements
 
 module OmniAuth
@@ -20,6 +24,7 @@ module OmniAuth
       option :include_data, []
       option :exclude_data, []
       option :additional_data, {}
+      option :api_methods, []
 
       option :client_options, {
         site: 'https://slack.com',
@@ -52,14 +57,16 @@ module OmniAuth
         end
       
         # Start with only what we can glean from the authorization response.
-        hash = { 
-          name: access_token.user_name,
-          email: access_token.user_email,
+        hash = Hash.new
+        apply_data_methods(hash)
+        hash.merge!({ 
+          #name: access_token.user_name,
+          #email: access_token.user_email,
           user_id: user_id,
           team_name: access_token.team_name,
           team_id: team_id,
           image: access_token['team'].to_h['image_34']
-        }
+        })
 
         # Now add everything else, using further calls to the api, if necessary.
         unless skip_info?
@@ -81,18 +88,18 @@ module OmniAuth
               user_info['user'].to_h['profile'].to_h['image_34'] ||
               user_profile['profile'].to_h['image_34']
               ),
-            name:(
-              hash[:name] ||
-              user_identity['name'] ||
-              user_info['user'].to_h['real_name'] ||
-              user_profile['profile'].to_h['real_name']
-              ),
-            email:(
-              hash[:email] ||
-              user_identity.to_h['email'] ||
-              user_info['user'].to_h['profile'].to_h['email'] ||
-              user_profile['profile'].to_h['email']
-              ),
+#             name:(
+#               hash[:name] ||
+#               user_identity['name'] ||
+#               user_info['user'].to_h['real_name'] ||
+#               user_profile['profile'].to_h['real_name']
+#               ),
+#             email:(
+#               hash[:email] ||
+#               user_identity.to_h['email'] ||
+#               user_info['user'].to_h['profile'].to_h['email'] ||
+#               user_profile['profile'].to_h['email']
+#               ),
             team_name:(
               hash[:team_name] ||
               team_identity.to_h['name'] ||
@@ -119,6 +126,7 @@ module OmniAuth
           }
           
           hash.merge!(more_info)
+          
         end
         hash
       end # info
@@ -221,6 +229,7 @@ module OmniAuth
       # Get a mutex specific to the calling method.
       # This operation is synchronized with its own mutex.
       def semaphore(method_name = caller[0][/`([^']*)'/, 1])
+        #log(:debug, "Synchronizing method #{method_name}.")
         @main_semaphore.synchronize {
           @semaphores[method_name] ||= Mutex.new
         }
@@ -296,18 +305,18 @@ module OmniAuth
         end
       end
       
-      def identity
-        semaphore.synchronize {
-          @identity ||= case
-            when (from_access_token = access_token.to_hash.select{|k,v| ['user', 'team'].include?(k.to_s)}) && from_access_token.any?
-              from_access_token
-            when ! (!skip_info? && is_not_excluded? && has_scope?(classic:'identity.basic', identity:'identity:read:user'))
-              {}
-            else
-              access_token.get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
-          end
-        }
-      end
+      # def identity
+      #   semaphore.synchronize {
+      #     @identity ||= case
+      #       when (from_access_token = access_token.to_hash.select{|k,v| ['user', 'team'].include?(k.to_s)}) && from_access_token.any?
+      #         from_access_token
+      #       when ! (!skip_info? && is_not_excluded? && has_scope?(classic:'identity.basic', identity:'identity:read:user'))
+      #         {}
+      #       else
+      #         access_token.get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
+      #     end
+      #   }
+      # end
 
       def user_identity
         @user_identity ||= identity['user'].to_h
@@ -406,8 +415,55 @@ module OmniAuth
       def has_scope?(scope_query, **opts)
         access_token.has_scope?(scope_query, **opts)
       end
+            
+            
+      # Experimental
+      include OmniAuth::Slack::DataMethods
+        
+      data_method :identity,
+        storage: :identity,
+        default_value: {},
+        sources: [
+          {source: 'access_token', code: proc{ r = to_hash.select{|k,v| ['user', 'team'].include?(k.to_s)}; r.any? && r} },
+          {source: 'api_users_identity'}
+        ]
+
+      data_method :user_name, info_key: 'name', storage: :user_name, sources: [
+        {source: 'access_token', code: 'user_name'},
+        {source: 'user_identity', code: "fetch('name',nil)"},
+        {source: 'user_info', code: "fetch('user',{}).to_h['real_name']"},
+        {source: 'user_profile', code: "fetch('profile',{}).to_h['real_name']"}
+      ]
       
-    end
-  end
-end
+      data_method :user_email, info_key: 'email', storage: :user_email, sources: [
+        {source: 'access_token', code: "user_email"},
+        {source: 'user_identity', code: "fetch('email',nil)"},
+        {source: 'user_info', code: "fetch('user',{}).to_h['profile'].to_h['email']"},
+        {source: 'user_profile', code: "fetch('profile',{}).to_h['email']"}
+      ]
+      
+      data_method :api_users_identity,
+        scopes: {classic:'identity.basic', identity:'identity:read:user'},
+        storage: :api_users_identity,
+        conditions: proc{ true },
+        default_value: {},
+        sources: [
+          {source: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
+        ]
+        
+#       data_method :demo_dsl do
+#         scope({classic:'identity.basic', identity:'identity:read:user'})
+#         storage true
+#         condition proc{ true }
+#         default_value Hash.new
+#         
+#         source 'access_token' do
+#           get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
+#         end
+#       end
+#       
+      @api_methods ||= dependencies_flat
+    end # Slack
+  end # Strategies
+end # OmniAuth
 

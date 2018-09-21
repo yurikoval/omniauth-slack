@@ -104,6 +104,10 @@ module OmniAuth
         # scope_query is a hash where:
         #   key == scope type <app_home|team|channel|group|mpim|im|identity|classic>
         #   val == array or string of individual scopes.
+        #   opts ==
+        #     user_id
+        #     base_scopes
+        #     logic
         #
         def has_scope?(scope_query, **opts)          
           user = opts[:user_id] || user_id
