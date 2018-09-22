@@ -60,7 +60,7 @@ module OmniAuth
           
           define_method(name) do
             method_opts = data_methods[__method__]
-            storage_name = method_opts[:storage]
+            storage_name = method_opts[:storage] || name
             
             if ivar_data = instance_variable_get("@#{storage_name}")
               #log(:debug, "Data method '#{name}' returning stored value: #{ivar_data}.")
@@ -78,8 +78,8 @@ module OmniAuth
                 (scopes = method_opts[:scopes]) && !has_scope?(scopes, method_opts[:scope_logic]) ||
                 (conditions = method_opts[:conditions]) && !(conditions.is_a?(Proc) ? conditions.call : eval(conditions))
               )
-                log(:debug, "Data method '#{name}' returning from unmet scopes or conditions.")
-                return
+                #log(:debug, "Data method '#{name}' returning from unmet scopes or conditions.")
+                return method_opts[:default_value]
               end
               
               #puts "Data method '#{name}' succeeded scopes & conditions."
@@ -116,7 +116,7 @@ module OmniAuth
               
               result ||= method_opts[:default_value]
               #log(:debug, "Data method '#{name}' returning: #{result}")
-              instance_variable_set(("@#{storage_name}"), result) if result && storage_name
+              instance_variable_set(("@#{storage_name}"), result) if result && storage_name && method_opts[:storage] != false
               result
               
             end # synchronize
@@ -163,7 +163,7 @@ module OmniAuth
       end
       
       def initialize(opts = Hashy.new)
-        OmniAuth.logger.log(0, "(slack) DataMethod Initializing with (#{opts}) #{'and block' if block_given?}.")
+        OmniAuth.logger.log(0, "(slack) Initialize DataMethod #{self.name}.")
         instance_eval &Proc.new if block_given?
       end
     

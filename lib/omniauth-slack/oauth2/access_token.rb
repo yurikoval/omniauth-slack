@@ -113,7 +113,8 @@ module OmniAuth
         def has_scope?(scope_query, opts={})
           opts ||= {}         
           user = opts[:user_id] || user_id
-          scope_query = [scope_query].flatten(1)
+          scope_query = [scope_query].flatten(3)
+          #puts "AccessToken#has_scope with user '#{user}' scope_query '#{scope_query}' opts '#{opts}'"
           
           logic = case
             when opts[:logic].to_s.downcase == 'or'; {outter: 'all?', inner: 'any?'}
@@ -146,7 +147,7 @@ module OmniAuth
               #puts "TESTING with base_scopes: #{base_scopes.to_yaml}"
               
               test_scopes.send(logic[:inner]) do |scope|
-                #puts "TESTING section: #{section.to_s}, scope: #{scope}"
+                #puts "Inner Scope Query section: #{section.to_s}, scope: #{scope}"
                 base_scopes.to_h[section.to_s].to_a.include?(scope.to_s)
               end
             end

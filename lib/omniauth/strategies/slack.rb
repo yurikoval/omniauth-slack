@@ -14,6 +14,9 @@ module OmniAuth
   module Strategies
     
     class Slack < OmniAuth::Strategies::OAuth2
+      
+      # Experimental
+      include OmniAuth::Slack::DataMethods
     
       AUTH_OPTIONS = %w(redirect_uri scope team team_domain )
       
@@ -72,20 +75,20 @@ module OmniAuth
         unless skip_info?
           %w(first_name last_name phone skype avatar_hash real_name real_name_normalized).each do |key|
             hash[key.to_sym] = (
-              user_info['user'].to_h['profile'] ||
+              api_user_info['user'].to_h['profile'] ||
               user_profile['profile']
             ).to_h[key]
           end
 
           %w(deleted status color tz tz_label tz_offset is_admin is_owner is_primary_owner is_restricted is_ultra_restricted is_bot has_2fa).each do |key|
-            hash[key.to_sym] = user_info['user'].to_h[key]
+            hash[key.to_sym] = api_user_info['user'].to_h[key]
           end
 
           more_info = {
             image: (
               hash[:image] ||
               user_identity.to_h['image_34'] ||
-              user_info['user'].to_h['profile'].to_h['image_34'] ||
+              api_user_info['user'].to_h['profile'].to_h['image_34'] ||
               user_profile['profile'].to_h['image_34']
               ),
 #             name:(
@@ -119,7 +122,7 @@ module OmniAuth
               team_info['team'].to_h['email_domain']
               ),
             nickname:(
-              user_info.to_h['user'].to_h['name'] ||
+              api_user_info.to_h['user'].to_h['name'] ||
               access_token['user'].to_h['name'] ||
               user_identity.to_h['name']
               ),
@@ -140,7 +143,7 @@ module OmniAuth
           bot_info: access_token['bot'] || bot_info['bot'],
           access_token_hash: access_token.to_hash,
           identity: @identity,
-          user_info: @user_info,
+          user_info: @api_user_info,
           user_profile: @user_profile,
           team_info: @team_info,
           additional_data: get_additional_data,
@@ -205,11 +208,19 @@ module OmniAuth
         full_host + script_name + callback_path
       end
       
-      def user_info
-        return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'users:read', team:'users:read')
-        semaphore.synchronize {
-          @user_info ||= access_token.get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
-        }
+      # def user_info
+      #   return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'users:read', team:'users:read')
+      #   semaphore.synchronize {
+      #     @user_info ||= access_token.get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
+      #   }
+      # end
+      
+      data_method :api_user_info do
+        default_value Hash.new
+        scope classic:'users:read', team:'users:read'
+        source :access_token do
+          get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
+        end
       end
       
       def auth_hash
@@ -239,7 +250,7 @@ module OmniAuth
         @active_methods ||= (
           includes = [options.include_data].flatten.compact
           excludes = [options.exclude_data].flatten.compact unless includes.size > 0
-          method_list = %w(apps_permissions_users_list identity user_info user_profile team_info bot_info)  #.concat(options[:additional_data].keys)
+          method_list = %w(apps_permissions_users_list api_users_identity api_user_info user_profile team_info bot_info)  #.concat(options[:additional_data].keys)
           if includes.size > 0
             method_list.keep_if {|m| includes.include?(m.to_s) || includes.include?(m.to_s.to_sym)}
           elsif excludes[0].to_s == 'all'
@@ -417,8 +428,6 @@ module OmniAuth
       end
             
             
-      # Experimental
-      include OmniAuth::Slack::DataMethods
         
       data_method :identity,
         storage: :identity,
@@ -431,14 +440,14 @@ module OmniAuth
       data_method :user_name, info_key: 'name', storage: :user_name, sources: [
         {source: 'access_token', code: 'user_name'},
         {source: 'user_identity', code: "fetch('name',nil)"},
-        {source: 'user_info', code: "fetch('user',{}).to_h['real_name']"},
+        {source: 'api_user_info', code: "fetch('user',{}).to_h['real_name']"},
         {source: 'user_profile', code: "fetch('profile',{}).to_h['real_name']"}
       ]
       
       data_method :user_email, info_key: 'email', storage: :user_email, sources: [
         {source: 'access_token', code: "user_email"},
         {source: 'user_identity', code: "fetch('email',nil)"},
-        {source: 'user_info', code: "fetch('user',{}).to_h['profile'].to_h['email']"},
+        {source: 'api_user_info', code: "fetch('user',{}).to_h['profile'].to_h['email']"},
         {source: 'user_profile', code: "fetch('profile',{}).to_h['email']"}
       ]
       
@@ -452,7 +461,7 @@ module OmniAuth
         ]
         
       data_method :demo_dsl do
-        scope({classic:'identity.basic', identity:'identity:read:user'})
+        scope classic:'identity.basic', identity:'identity:read:user'
         storage true
         condition proc{ true }
         default_value Hash.new
