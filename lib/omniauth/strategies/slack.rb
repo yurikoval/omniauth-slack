@@ -75,21 +75,21 @@ module OmniAuth
         unless skip_info?
           %w(first_name last_name phone skype avatar_hash real_name real_name_normalized).each do |key|
             hash[key.to_sym] = (
-              api_user_info['user'].to_h['profile'] ||
-              user_profile['profile']
+              api_users_info['user'].to_h['profile'] ||
+              api_users_profile['profile']
             ).to_h[key]
           end
 
           %w(deleted status color tz tz_label tz_offset is_admin is_owner is_primary_owner is_restricted is_ultra_restricted is_bot has_2fa).each do |key|
-            hash[key.to_sym] = api_user_info['user'].to_h[key]
+            hash[key.to_sym] = api_users_info['user'].to_h[key]
           end
 
           more_info = {
             image: (
               hash[:image] ||
               user_identity.to_h['image_34'] ||
-              api_user_info['user'].to_h['profile'].to_h['image_34'] ||
-              user_profile['profile'].to_h['image_34']
+              api_users_info['user'].to_h['profile'].to_h['image_34'] ||
+              api_users_profile['profile'].to_h['image_34']
               ),
 #             name:(
 #               hash[:name] ||
@@ -106,23 +106,23 @@ module OmniAuth
             team_name:(
               hash[:team_name] ||
               team_identity.to_h['name'] ||
-              team_info['team'].to_h['name']
+              api_team_info['team'].to_h['name']
               ),
             team_domain:(
               access_token['team'].to_h['domain'] ||
               team_identity.to_h['domain'] ||
-              team_info['team'].to_h['domain']
+              api_team_info['team'].to_h['domain']
               ),
             team_image:(
               access_token['team'].to_h['image_34'] ||
               team_identity.to_h['image_34'] ||
-              team_info['team'].to_h['icon'].to_h['image_34']
+              api_team_info['team'].to_h['icon'].to_h['image_34']
               ),
             team_email_domain:(
-              team_info['team'].to_h['email_domain']
+              api_team_info['team'].to_h['email_domain']
               ),
             nickname:(
-              api_user_info.to_h['user'].to_h['name'] ||
+              api_users_info.to_h['user'].to_h['name'] ||
               access_token['user'].to_h['name'] ||
               user_identity.to_h['name']
               ),
@@ -140,12 +140,12 @@ module OmniAuth
           #   (env['omniauth.strategy'] && env['omniauth.strategy'].options && env['omniauth.strategy'].options.scope),
           scopes_requested: scopes_requested,
           web_hook_info: web_hook_info,
-          bot_info: access_token['bot'] || bot_info['bot'],
+          bot_info: access_token['bot'] || api_bots_info['bot'],
           access_token_hash: access_token.to_hash,
           identity: @identity,
-          user_info: @api_user_info,
-          user_profile: @user_profile,
-          team_info: @team_info,
+          user_info: @api_users_info,
+          user_profile: @api_users_profile,
+          team_info: @api_team_info,
           additional_data: get_additional_data,
           raw_info: @raw_info
         }
@@ -208,21 +208,6 @@ module OmniAuth
         full_host + script_name + callback_path
       end
       
-      # def user_info
-      #   return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'users:read', team:'users:read')
-      #   semaphore.synchronize {
-      #     @user_info ||= access_token.get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
-      #   }
-      # end
-      
-      data_method :api_user_info do
-        default_value Hash.new
-        scope classic:'users:read', team:'users:read'
-        source :access_token do
-          get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
-        end
-      end
-      
       def auth_hash
         define_additional_data #unless skip_info?
         super
@@ -250,7 +235,7 @@ module OmniAuth
         @active_methods ||= (
           includes = [options.include_data].flatten.compact
           excludes = [options.exclude_data].flatten.compact unless includes.size > 0
-          method_list = %w(apps_permissions_users_list api_users_identity api_user_info user_profile team_info bot_info)  #.concat(options[:additional_data].keys)
+          method_list = %w(apps_permissions_users_list api_users_identity api_users_info api_users_profile api_team_info api_bots_info)  #.concat(options[:additional_data].keys)
           if includes.size > 0
             method_list.keep_if {|m| includes.include?(m.to_s) || includes.include?(m.to_s.to_sym)}
           elsif excludes[0].to_s == 'all'
@@ -328,7 +313,24 @@ module OmniAuth
       #     end
       #   }
       # end
+      
+      data_method :identity,
+        storage: :identity,
+        default_value: {},
+        sources: [
+          {source: 'access_token', code: proc{ r = to_hash.select{|k,v| ['user', 'team'].include?(k.to_s)}; r.any? && r} },
+          {source: 'api_users_identity'}
+        ]
 
+      data_method :api_users_identity,
+        scopes: {classic:'identity.basic', identity:'identity:read:user'},
+        storage: :api_users_identity,
+        conditions: proc{ true },
+        default_value: {},
+        sources: [
+          {source: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
+        ]
+        
       def user_identity
         @user_identity ||= identity['user'].to_h
       end
@@ -337,30 +339,70 @@ module OmniAuth
         @team_identity ||= identity['team'].to_h
       end
       
-      def user_profile
-        return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'users.profile:read', team:'users.profile:read')
-        semaphore.synchronize {
-          @user_profile ||= access_token.get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
-        }
+      # def user_info
+      #   return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'users:read', team:'users:read')
+      #   semaphore.synchronize {
+      #     @user_info ||= access_token.get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
+      #   }
+      # end
+      
+      data_method :api_users_info do
+        default_value Hash.new
+        scope classic: 'users:read', team: 'users:read'
+        source :access_token do
+          get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
+        end
+      end
+      
+      # def user_profile
+      #   return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'users.profile:read', team:'users.profile:read')
+      #   semaphore.synchronize {
+      #     @user_profile ||= access_token.get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
+      #   }
+      # end
+      
+      data_method :api_users_profile do
+        default_value Hash.new
+        scope classic: 'users.profile:read', team: 'users.profile:read'
+        source :access_token do
+          get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
+        end
+      end      
+
+      # def team_info
+      #   return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'team:read', team:'team:read')
+      #   semaphore.synchronize {
+      #     @team_info ||= access_token.get('/api/team.info').parsed
+      #   }
+      # end
+      
+      data_method :api_team_info do
+        scope classic: 'team:read', team:'team:read'
+        default_value Hash.new
+        source :access_token do
+          get('/api/team.info').parsed
+        end
       end
 
-      def team_info
-        return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'team:read', team:'team:read')
-        semaphore.synchronize {
-          @team_info ||= access_token.get('/api/team.info').parsed
-        }
-      end
 
       def web_hook_info
         #return {} unless access_token.key? 'incoming_webhook'
         access_token['incoming_webhook']
       end
       
-      def bot_info
-        return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'users:read', team:'users:read')
-        semaphore.synchronize {
-          @bot_info ||= access_token.get('/api/bots.info').parsed
-        }
+      # def bot_info
+      #   return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'users:read', team:'users:read')
+      #   semaphore.synchronize {
+      #     @bot_info ||= access_token.get('/api/bots.info').parsed
+      #   }
+      # end
+      
+      data_method :api_bots_info do
+        scope classic: 'users:read', team: 'users:read'
+        default_value Hash.new
+        source :access_token do
+          get('/api/bots.info').parsed
+        end
       end
       
       def user_id
@@ -372,6 +414,20 @@ module OmniAuth
         # access_token['team_id'] || access_token['team'].to_h['id']
         access_token.team_id
       end
+      
+      data_method :user_name, info_key: 'name', storage: :user_name, sources: [
+        {source: 'access_token', code: 'user_name'},
+        {source: 'user_identity', code: "fetch('name',nil)"},
+        {source: 'api_users_info', code: "fetch('user',{}).to_h['real_name']"},
+        {source: 'api_users_profile', code: "fetch('profile',{}).to_h['real_name']"}
+      ]
+      
+      data_method :user_email, info_key: 'email', storage: :user_email, sources: [
+        {source: 'access_token', code: "user_email"},
+        {source: 'user_identity', code: "fetch('email',nil)"},
+        {source: 'api_users_info', code: "fetch('user',{}).to_h['profile'].to_h['email']"},
+        {source: 'api_users_profile', code: "fetch('profile',{}).to_h['email']"}
+      ]
       
       # This hash is handed to the access-token, which in turn fills it with API response objects.
       def raw_info
@@ -392,6 +448,11 @@ module OmniAuth
         access_token.apps_permissions_users_list(user)
       end
       
+      # Is this a workspace app token?
+      def is_app_token?
+        access_token.is_app_token?
+      end
+      
       def scopes_requested
         #(env['omniauth.params'] && env['omniauth.params']['scope']) || options.scope
         
@@ -400,11 +461,6 @@ module OmniAuth
         # options.scope
 
         env['omniauth.authorize_params'].to_h['scope']
-      end
-      
-      # Is this a workspace app token?
-      def is_app_token?
-        access_token.is_app_token?
       end
       
       # Scopes come from at least 3 different places now.
@@ -426,50 +482,18 @@ module OmniAuth
       def has_scope?(scope_query, opts={})
         access_token.has_scope?(scope_query, opts)
       end
-            
-            
-        
-      data_method :identity,
-        storage: :identity,
-        default_value: {},
-        sources: [
-          {source: 'access_token', code: proc{ r = to_hash.select{|k,v| ['user', 'team'].include?(k.to_s)}; r.any? && r} },
-          {source: 'api_users_identity'}
-        ]
-
-      data_method :user_name, info_key: 'name', storage: :user_name, sources: [
-        {source: 'access_token', code: 'user_name'},
-        {source: 'user_identity', code: "fetch('name',nil)"},
-        {source: 'api_user_info', code: "fetch('user',{}).to_h['real_name']"},
-        {source: 'user_profile', code: "fetch('profile',{}).to_h['real_name']"}
-      ]
       
-      data_method :user_email, info_key: 'email', storage: :user_email, sources: [
-        {source: 'access_token', code: "user_email"},
-        {source: 'user_identity', code: "fetch('email',nil)"},
-        {source: 'api_user_info', code: "fetch('user',{}).to_h['profile'].to_h['email']"},
-        {source: 'user_profile', code: "fetch('profile',{}).to_h['email']"}
-      ]
       
-      data_method :api_users_identity,
-        scopes: {classic:'identity.basic', identity:'identity:read:user'},
-        storage: :api_users_identity,
-        conditions: proc{ true },
-        default_value: {},
-        sources: [
-          {source: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
-        ]
-        
-      data_method :demo_dsl do
-        scope classic:'identity.basic', identity:'identity:read:user'
-        storage true
-        condition proc{ true }
-        default_value Hash.new
-        
-        source 'access_token' do
-          get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
-        end
-      end
+      # data_method :demo_dsl do
+      #   scope classic:'identity.basic', identity:'identity:read:user'
+      #   storage true
+      #   condition proc{ true }
+      #   default_value Hash.new
+      #   
+      #   source 'access_token' do
+      #     get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
+      #   end
+      # end
       
       @api_methods.to_a.any? || @api_methods = dependencies_flat
     end # Slack

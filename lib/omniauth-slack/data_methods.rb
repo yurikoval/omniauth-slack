@@ -29,6 +29,7 @@ module OmniAuth
         #   args.any? ? @api_methods=args : @api_methods
         # end
         
+        # List data-methods and their dependencies.
         def dependencies
           result = Hashy.new
           data_methods.each do |key, val|
@@ -38,10 +39,12 @@ module OmniAuth
           result
         end
 
+        # Flatten all dependencies to an array of uniq strings.
         def dependencies_flat
-          dependencies.map{|k,v| v}.flatten(-1).uniq
+          dependencies.map{|k,v| v}.flatten(-1).inject([]){|a,v| a << v.to_s; a}.uniq
         end  
         
+        # Which dependencies are missing callable methods.
         def missing_dependencies
           dependencies_flat.select{|m| !method_defined?(m) && !private_method_defined?(m)}
         end 
