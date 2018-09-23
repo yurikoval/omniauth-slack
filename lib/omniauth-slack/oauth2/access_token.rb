@@ -111,7 +111,7 @@ module OmniAuth
         #     logic
         #
         def has_scope?(scope_query, opts={})
-          puts "HasScope: #{scope_query} with opts: '#{opts}'"
+          #puts "HasScope: #{scope_query} with opts: '#{opts}'"
           # if scope_query.is_a?(Array) && scope_query[0].is_a?(Array)
           #   puts "Processing list of scope queries"
           #   return scope_query.all?{|query| puts "Processing scope query: #{query}"; has_scope?(*query)}

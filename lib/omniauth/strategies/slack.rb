@@ -27,7 +27,7 @@ module OmniAuth
       option :include_data, []
       option :exclude_data, []
       option :additional_data, {}
-      option :api_methods, []
+      option :dependencies, nil
 
       option :client_options, {
         site: 'https://slack.com',
@@ -178,7 +178,9 @@ module OmniAuth
       end
       
       def callback_phase(*args)
+        # This technique copied from OmniAuth::Strategy
         env['omniauth.authorize_params'] = session.delete('omniauth.authorize_params')
+        #@api_methods = options[:api_methods]
         super
       end
       
@@ -487,16 +489,21 @@ module OmniAuth
       data_method :demo_dsl do
         scope classic:'identity.basic', identity:'identity:read:user'
         scope team:'conversations:read', app_home:'chat:write'
-        storage true
+        storage false
         condition proc{ true }
+        condition proc{ ! false }
         default_value Hash.new
         
         source 'access_token' do
           get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
         end
+        
+        source 'self' do
+          "Hi!"
+        end
       end
       
-      @api_methods.to_a.any? || @api_methods = dependencies_flat
+      #@api_methods.to_a.any? || @api_methods = dependencies_flat
     end # Slack
   end # Strategies
 end # OmniAuth
