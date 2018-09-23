@@ -27,7 +27,7 @@ module OmniAuth
       option :include_data, []
       option :exclude_data, []
       option :additional_data, {}
-      option :dependencies, nil
+      #option :dependencies, nil
 
       option :client_options, {
         site: 'https://slack.com',
@@ -180,7 +180,6 @@ module OmniAuth
       def callback_phase(*args)
         # This technique copied from OmniAuth::Strategy
         env['omniauth.authorize_params'] = session.delete('omniauth.authorize_params')
-        #@api_methods = options[:api_methods]
         super
       end
       

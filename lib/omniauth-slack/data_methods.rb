@@ -13,6 +13,10 @@ module OmniAuth
     class Mashy < Hashie::Mash
     end
 
+
+    # Include DataMethods module in your OmniAuth::Strategy class
+    # to gain flexible method dependency management.
+
     module DataMethods
           
       def self.included(other)
@@ -21,6 +25,7 @@ module OmniAuth
           extend Extensions
           singleton_class.send :attr_reader, :data_methods
           @data_methods ||= Hashy.new
+          option :dependencies, nil
         end
       end
             
@@ -149,7 +154,7 @@ module OmniAuth
 
 
 
-#####  DataMethod Class  #####
+    #####  DataMethod Class  #####
 
     class DataMethod < Hashy
       #include Hashie::Extensions::StrictKeyAccess
