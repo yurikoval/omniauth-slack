@@ -317,18 +317,18 @@ module OmniAuth
       data_method :identity,
         storage: :identity,
         default_value: {},
-        sources: [
-          {source: 'access_token', code: proc{ r = to_hash.select{|k,v| ['user', 'team'].include?(k.to_s)}; r.any? && r} },
-          {source: 'api_users_identity'}
+        source: [
+          {name: 'access_token', code: proc{ r = to_hash.select{|k,v| ['user', 'team'].include?(k.to_s)}; r.any? && r} },
+          {name: 'api_users_identity'}
         ]
 
       data_method :api_users_identity,
-        scopes: {classic:'identity.basic', identity:'identity:read:user'},
+        scope: {classic:'identity.basic', identity:'identity:read:user'},
         storage: :api_users_identity,
-        conditions: proc{ true },
+        condition: proc{ true },
         default_value: {},
-        sources: [
-          {source: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
+        source: [
+          {name: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
         ]
         
       def user_identity
@@ -415,18 +415,18 @@ module OmniAuth
         access_token.team_id
       end
       
-      data_method :user_name, info_key: 'name', storage: :user_name, sources: [
-        {source: 'access_token', code: 'user_name'},
-        {source: 'user_identity', code: "fetch('name',nil)"},
-        {source: 'api_users_info', code: "fetch('user',{}).to_h['real_name']"},
-        {source: 'api_users_profile', code: "fetch('profile',{}).to_h['real_name']"}
+      data_method :user_name, info_key: 'name', storage: :user_name, source: [
+        {name: 'access_token', code: 'user_name'},
+        {name: 'user_identity', code: "fetch('name',nil)"},
+        {name: 'api_users_info', code: "fetch('user',{}).to_h['real_name']"},
+        {name: 'api_users_profile', code: "fetch('profile',{}).to_h['real_name']"}
       ]
       
-      data_method :user_email, info_key: 'email', storage: :user_email, sources: [
-        {source: 'access_token', code: "user_email"},
-        {source: 'user_identity', code: "fetch('email',nil)"},
-        {source: 'api_users_info', code: "fetch('user',{}).to_h['profile'].to_h['email']"},
-        {source: 'api_users_profile', code: "fetch('profile',{}).to_h['email']"}
+      data_method :user_email, info_key: 'email', storage: :user_email, source: [
+        {name: 'access_token', code: "user_email"},
+        {name: 'user_identity', code: "fetch('email',nil)"},
+        {name: 'api_users_info', code: "fetch('user',{}).to_h['profile'].to_h['email']"},
+        {name: 'api_users_profile', code: "fetch('profile',{}).to_h['email']"}
       ]
       
       # This hash is handed to the access-token, which in turn fills it with API response objects.
@@ -484,16 +484,17 @@ module OmniAuth
       end
       
       
-      # data_method :demo_dsl do
-      #   scope classic:'identity.basic', identity:'identity:read:user'
-      #   storage true
-      #   condition proc{ true }
-      #   default_value Hash.new
-      #   
-      #   source 'access_token' do
-      #     get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
-      #   end
-      # end
+      data_method :demo_dsl do
+        scope classic:'identity.basic', identity:'identity:read:user'
+        scope team:'conversations:read', app_home:'chat:write'
+        storage true
+        condition proc{ true }
+        default_value Hash.new
+        
+        source 'access_token' do
+          get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
+        end
+      end
       
       @api_methods.to_a.any? || @api_methods = dependencies_flat
     end # Slack

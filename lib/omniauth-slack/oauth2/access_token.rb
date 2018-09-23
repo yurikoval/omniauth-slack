@@ -111,9 +111,14 @@ module OmniAuth
         #     logic
         #
         def has_scope?(scope_query, opts={})
+          puts "HasScope: #{scope_query} with opts: '#{opts}'"
+          # if scope_query.is_a?(Array) && scope_query[0].is_a?(Array)
+          #   puts "Processing list of scope queries"
+          #   return scope_query.all?{|query| puts "Processing scope query: #{query}"; has_scope?(*query)}
+          # end
           opts ||= {}         
           user = opts[:user_id] || user_id
-          scope_query = [scope_query].flatten(3)
+          scope_query = [scope_query].flatten
           #puts "AccessToken#has_scope with user '#{user}' scope_query '#{scope_query}' opts '#{opts}'"
           
           logic = case

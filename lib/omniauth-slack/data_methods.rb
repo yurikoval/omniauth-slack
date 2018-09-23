@@ -34,7 +34,7 @@ module OmniAuth
           result = Hashy.new
           data_methods.each do |key, val|
             #puts "DataMethods::Extensions.dependencies, data_methods.each, key '#{key}' val-type '#{val.class}'"
-            result[key] = val.sources.to_a.map{|s| s[:source]}
+            result[key] = val.source.to_a.map{|s| s[:name]}
           end
           result
         end
@@ -65,21 +65,20 @@ module OmniAuth
             method_opts = data_methods[__method__]
             storage_name = method_opts[:storage] || name
             
-            if ivar_data = instance_variable_get("@#{storage_name}")
-              #log(:debug, "Data method '#{name}' returning stored value: #{ivar_data}.")
-              return ivar_data
-            else
-              #log(:debug, "Data method '#{name}' computing value.")
-            end
-            
-            # TODO: Does this need to go before scopes, or can it go after?
-            #       I think as long as has_scope and its associated api calls are all sync'd,
-            #       we should be ok syncing after the scopes.
             semaphore(name).synchronize do
             
+              if ivar_data = instance_variable_get("@#{storage_name}")
+                #log(:debug, "Data method '#{name}' returning stored value: #{ivar_data}.")
+                return ivar_data
+              else
+                #log(:debug, "Data method '#{name}' computing value.")
+              end
+            
+              log(:debug, "Data method '#{name}' asking has_scope? with '#{method_opts[:scope]}' and opts '#{method_opts[:scope_opts]}'")
               if (
-                (scopes = method_opts[:scopes]) && !has_scope?(scopes, method_opts[:scope_logic]) ||
-                (conditions = method_opts[:conditions]) && !(conditions.is_a?(Proc) ? conditions.call : eval(conditions))
+                #(scopes = method_opts[:scope]) && !has_scope?(scopes, method_opts[:scope_opts]) ||
+                (scopes = method_opts[:scope]) && !has_scope?(scopes, method_opts[:scope_opts]) ||
+                (conditions = method_opts[:condition]) && !(conditions.is_a?(Proc) ? conditions.call : eval(conditions))
               )
                 #log(:debug, "Data method '#{name}' returning from unmet scopes or conditions.")
                 return method_opts[:default_value]
@@ -88,10 +87,11 @@ module OmniAuth
               #puts "Data method '#{name}' succeeded scopes & conditions."
               result = nil
               api_methods.each do |apim|
-                sources = method_opts[:sources].select{|h| h[:source].to_s == apim.to_s}
+                sources = method_opts[:source].select{|h| h[:name].to_s == apim.to_s}
                 #puts "Data method '#{name}' with api_method '#{apim}'"
                 sources.each do |source|
-                  source_method = source[:source]
+                  #puts "Processing source for '#{name}': #{source}"
+                  source_method = source[:name]
                   source_code = source[:code]
                   method_result = send source_method
                   #puts "Data method '#{name}' with source_method '#{source_method}': #{method_result.class}"
@@ -169,34 +169,50 @@ module OmniAuth
         OmniAuth.logger.log(0, "(slack) Initialize DataMethod #{self.name}.")
         instance_eval &Proc.new if block_given?
       end
-    
-      def scope(*opts)
-        self[:scopes] ||= []
+      
+      # Expects same args as AccessToken#has_scope?
+      #   query == hash or array of hashes
+      #   opts (options) == hash of options
+      def scope(*args)
+        return super unless args.any?
+        self[:scope] ||= []
         #OmniAuth.logger.log(0, "(slack) DataMethod 'scope' with (#{opts})")
-        self[:scopes] << opts
+        #self[:scope] << scope_query.flatten
+        #self[:scope].flatten!
+        query = args.shift
+        opts = args.last
+        self[:scope_opts] = opts if opts
+        self[:scope] << query
+        self[:scope].flatten!
       end
       
-      def source(name, opts = Hashy.new)
-        self[:sources] ||= []
+      def scope_opts(opts={})
+        return super unless opts && opts.any?
+        self[:scope_opts] = opts
+      end
+      
+      def source(name = nil, opts = Hashy.new)
+        return super unless name
+        self[:source] ||= []
         prc = block_given? ? Proc.new : nil
         #OmniAuth.logger.log(0, "(slack) DataMethod 'source' with (#{name}, #{opts}, #{prc})")
-        source_hash = Hashy.new({source: name}.merge(opts))
+        source_hash = Hashy.new({name: name}.merge(opts))
         source_hash[:code] = prc if prc
-        self[:sources] << source_hash
-        #OmniAuth.logger.log(0, "(slack) DataMethod 'source' with sources: (#{sources})")
-        source_hash
+        self[:source] << source_hash
       end
       
-      def storage(arg)
+      def storage(arg = nil)
+        return super unless arg
         #OmniAuth.logger.log(0, "(slack) DataMethod 'storage with (#{arg})")
         self[:storage] = arg
       end
       
       def condition(code = nil)
-        self[:conditions] ||= []
+        return super unless code
+        self[:condition] ||= []
         code = block_given? ? Proc.new : code
         #OmniAuth.logger.log(0, "(slack) DataMethod 'condition' with (#{code})")
-        self[:conditions] << code
+        self[:condition] << code
       end
       
       def default_value(arg)
