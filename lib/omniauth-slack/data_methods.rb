@@ -30,7 +30,7 @@ module OmniAuth
       end
             
       def dependencies
-        options.dependencies || @dependencies ||= self.class.dependencies
+        options.dependencies || @dependencies ||= self.class.dependencies.keys
       end
       
       def data_methods; self.class.data_methods; end
@@ -63,12 +63,14 @@ module OmniAuth
 
         # Flatten compiled dependency_tree into an array of uniq strings.
         def dependencies
-          dependency_tree.map{|k,v| v}.flatten(-1).inject([]){|a,v| a << v.to_s; a}.uniq
+          #dependency_tree.map{|k,v| v}.flatten(-1).inject([]){|a,v| a << v.to_s; a}.uniq
+          deps = dependency_tree.map{|k,v| v}.flatten(-1).inject([]){|a,v| a << v.to_s; a}
+          deps.inject({}){|h, v| h[v] ? h[v] +=1 : h[v] = 1; h}
         end  
         
         # Which dependencies are missing callable methods.
         def missing_dependencies
-          dependencies.select{|m| !method_defined?(m) && !private_method_defined?(m)}
+          dependencies.keys.select{|m| !method_defined?(m) && !private_method_defined?(m)}
         end 
         
         # Build a DataMethod object from a hash or a block.
@@ -106,7 +108,7 @@ module OmniAuth
                 
                 #puts "Data method '#{name}' succeeded scopes & conditions."
                 result = nil
-                dependencies.each do |apim|
+                dependencies.keys.each do |apim|
                   sources = method_opts[:source].select{|h| h[:name].to_s == apim.to_s}
                   #puts "Data method '#{name}' with api_method '#{apim}'"
                   sources.each do |source|
