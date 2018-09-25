@@ -1,5 +1,20 @@
 require 'hashie'
 
+module RefineArray
+  refine Array do
+    def sort_with(reference_array)
+      # sort_by{|x| reference_array.index x.object_id}
+      
+      # This handles items not in the reference_array
+      ai = reference_array.each_with_index.to_h
+      sort_by { |e| [ai[e] || reference_array.size, e] }
+    end
+  end
+end
+
+using RefineArray
+
+
 module OmniAuth
   module Slack
   
@@ -64,8 +79,17 @@ module OmniAuth
         end
       end
             
-      def dependencies
-        options.dependencies || @dependencies ||= self.class.dependencies.keys
+      def dependencies(filter=nil)
+        # If you provide a filter, this will return the master dependency list (filtered).
+        if filter
+          self.class.dependencies(filter).keys
+        else
+          options.dependencies || @dependencies ||= self.class.dependencies(dependency_filter).keys
+        end
+      end
+      
+      def dependency_filter
+        options.dependency_filter
       end
       
       def data_methods; self.class.data_methods; end
@@ -157,12 +181,23 @@ module OmniAuth
                 result = nil  # see below
               else
                 
-                #puts "Data method '#{name}' succeeded scopes & conditions."
+                puts "Data method '#{name}' succeeded scopes & conditions."
                 result = nil
-                dependencies.each do |dep_name|
-                  sources = method_opts[:source].select{|src| src[:name].to_s == dep_name.to_s }
+                # TODO: Get rid of this dependencies block (see readme-dev).
+                #       Redo this with the sources loop on top, and run thru master deps list only once.
+                #       Logic:
+                #         selected_sources = <source name is in user-deps || source name not in master-deps>
+                #         selected_sources.sort_with(user-deps | master-deps)
+                #         selected_sources.each {execute}
+                dependencies(/.*/).each do |dep_name|
+                  #log(:debug, "Data method '#{name}' with dep_name '#{dep_name}'")
+                  #sources = method_opts[:source].select{|src| src[:name].to_s == dep_name.to_s }
                   #sources = method_opts[:source].select{|src| src[:name].to_s == dep_name.to_s || method_opts.api_dependencies_array.include?(dep_name) && !self.class.dependencies.include?(src[:name].to_s)}
-                  #puts "Data method '#{name}' with api_method '#{dep_name}'"
+                  sources = method_opts[:source].select do |src|
+                    src.name.to_s == dep_name.to_s ||
+                    !dependencies(/.*/).include?(src.name.to_s)
+                  end
+                  log(:debug, "Data method '#{name}' with dep_name '#{dep_name}' with selected sources: #{sources}") if sources.any?
                   sources.each do |source|
                     #puts "Processing source for '#{name}': #{source}"
                     source_target = source[:name]
