@@ -57,6 +57,7 @@ module OmniAuth
       
         # Parsed identity scopes (workspace apps only).
         def apps_permissions_users_list(user=nil)
+          #raise StandardError, "APUL caller #{caller[0][/`([^']*)'/, 1]} user #{user}"
           return {} unless is_app_token?
           semaphore.synchronize {
             @apps_permissions_users_list ||= (
@@ -147,7 +148,7 @@ module OmniAuth
               test_scopes = case
                 when scopes.is_a?(String); scopes.split(/[, ]/)
                 when scopes.is_a?(Array); scopes
-                else raise "Scope must be a string or array"
+                else raise "Scope data must be a string or array or strings, like this {team: 'chat:write,team:read', channels: ['channels:read', 'chat:write']}"
               end
               #puts "TESTING with base_scopes: #{base_scopes.to_yaml}"
               

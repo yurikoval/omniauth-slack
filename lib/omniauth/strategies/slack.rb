@@ -1,12 +1,9 @@
 require 'omniauth/strategies/oauth2'
 require 'omniauth-slack/refinements'
 require 'omniauth-slack/slack'
+require 'omniauth-slack/data_methods'
 require 'thread'
 require 'uri'
-
-# Experimental
-require 'omniauth-slack/data_methods'
-
 
 using OmniAuth::Slack::Refinements
 
@@ -236,7 +233,7 @@ module OmniAuth
         @active_methods ||= (
           includes = [options.include_data].flatten.compact
           excludes = [options.exclude_data].flatten.compact unless includes.size > 0
-          method_list = %w(apps_permissions_users_list api_users_identity api_users_info api_users_profile api_team_info api_bots_info)  #.concat(options[:additional_data].keys)
+          method_list = %w(api_apps_permissions_users_list api_users_identity api_users_info api_users_profile api_team_info api_bots_info)  #.concat(options[:additional_data].keys)
           if includes.size > 0
             method_list.keep_if {|m| includes.include?(m.to_s) || includes.include?(m.to_s.to_sym)}
           elsif excludes[0].to_s == 'all'
@@ -301,26 +298,14 @@ module OmniAuth
           end
         end
       end
-      
-      # def identity
-      #   semaphore.synchronize {
-      #     @identity ||= case
-      #       when (from_access_token = access_token.to_hash.select{|k,v| ['user', 'team'].include?(k.to_s)}) && from_access_token.any?
-      #         from_access_token
-      #       when ! (!skip_info? && is_not_excluded? && has_scope?(classic:'identity.basic', identity:'identity:read:user'))
-      #         {}
-      #       else
-      #         access_token.get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
-      #     end
-      #   }
-      # end
-      
+
       data_method :identity,
         storage: :identity,
         default_value: {},
         source: [
-          {name: 'access_token', code: proc{ r = to_hash.select{|k,v| ['user', 'team'].include?(k.to_s)}; r.any? && r} },
-          {name: 'api_users_identity'}
+          # TODO: This line can be simplified by not converting AT to hash.
+          {name: :access_token, code: proc{ r = to_hash.select{|k,v| ['user', 'team'].include?(k.to_s)}; r.any? && r} },
+          {name: :api_users_identity}
         ]
 
       data_method :api_users_identity,
@@ -331,22 +316,7 @@ module OmniAuth
         source: [
           {name: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
         ]
-        
-      def user_identity
-        @user_identity ||= identity['user'].to_h
-      end
 
-      def team_identity
-        @team_identity ||= identity['team'].to_h
-      end
-      
-      # def user_info
-      #   return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'users:read', team:'users:read')
-      #   semaphore.synchronize {
-      #     @user_info ||= access_token.get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
-      #   }
-      # end
-      
       data_method :api_users_info do
         default_value Hash.new
         scope classic: 'users:read', team: 'users:read'
@@ -354,14 +324,7 @@ module OmniAuth
           get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
         end
       end
-      
-      # def user_profile
-      #   return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'users.profile:read', team:'users.profile:read')
-      #   semaphore.synchronize {
-      #     @user_profile ||= access_token.get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
-      #   }
-      # end
-      
+
       data_method :api_users_profile do
         default_value Hash.new
         scope classic: 'users.profile:read', team: 'users.profile:read'
@@ -370,13 +333,6 @@ module OmniAuth
         end
       end      
 
-      # def team_info
-      #   return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'team:read', team:'team:read')
-      #   semaphore.synchronize {
-      #     @team_info ||= access_token.get('/api/team.info').parsed
-      #   }
-      # end
-      
       data_method :api_team_info do
         scope classic: 'team:read', team:'team:read'
         default_value Hash.new
@@ -384,19 +340,6 @@ module OmniAuth
           get('/api/team.info').parsed
         end
       end
-
-
-      def web_hook_info
-        #return {} unless access_token.key? 'incoming_webhook'
-        access_token['incoming_webhook']
-      end
-      
-      # def bot_info
-      #   return {} unless !skip_info? && is_not_excluded? && has_scope?(classic:'users:read', team:'users:read')
-      #   semaphore.synchronize {
-      #     @bot_info ||= access_token.get('/api/bots.info').parsed
-      #   }
-      # end
       
       data_method :api_bots_info do
         scope classic: 'users:read', team: 'users:read'
@@ -406,16 +349,26 @@ module OmniAuth
         end
       end
       
-      def user_id
-        # access_token['user_id'] || access_token['user'].to_h['id'] || access_token['authorizing_user'].to_h['user_id']
-        access_token.user_id
-      end
       
-      def team_id
-        # access_token['team_id'] || access_token['team'].to_h['id']
-        access_token.team_id
-      end
+      # API call to get user permissions for workspace token.
+      # This is needed because workspace token 'sign-in-with-slack' is missing scopes
+      # in the :scope field (acknowledged issue in developer preview).
+      #
+      # Returns [<id>: <resource>]
+      # def apps_permissions_users_list(user=nil)
+      #   return {} unless is_not_excluded? && is_app_token?  # && !skip_info?
+      #   # semaphore.synchronize {
+      #   #   @apps_permissions_users_list ||= access_token.apps_permissions_users_list
+      #   #   user_id ? @apps_permissions_users_list[user_id].to_h['scopes'] : @apps_permissions_users_list
+      #   # }
+      #   access_token.apps_permissions_users_list(user)
+      # end
       
+      data_method :api_apps_permissions_users_list do
+        condition -> { is_app_token? }
+        source :access_token, 'apps_permissions_users_list(user)'
+      end
+              
       data_method :user_name, info_key: 'name', storage: :user_name, source: [
         {name: 'access_token', code: 'user_name'},
         {name: 'user_identity', code: "fetch('name',nil)"},
@@ -429,26 +382,35 @@ module OmniAuth
         {name: 'api_users_info', code: "fetch('user',{}).to_h['profile'].to_h['email']"},
         {name: 'api_users_profile', code: "fetch('profile',{}).to_h['email']"}
       ]
+            
+      def user_id
+        # access_token['user_id'] || access_token['user'].to_h['id'] || access_token['authorizing_user'].to_h['user_id']
+        access_token.user_id
+      end
       
+      def team_id
+        # access_token['team_id'] || access_token['team'].to_h['id']
+        access_token.team_id
+      end
+
+      def user_identity
+        @user_identity ||= identity['user'].to_h
+      end
+
+      def team_identity
+        @team_identity ||= identity['team'].to_h
+      end
+
+      def web_hook_info
+        #return {} unless access_token.key? 'incoming_webhook'
+        access_token['incoming_webhook']
+      end      
+
       # This hash is handed to the access-token, which in turn fills it with API response objects.
       def raw_info
         @raw_info ||= {}
       end
-      
-      # API call to get user permissions for workspace token.
-      # This is needed because workspace token 'sign-in-with-slack' is missing scopes
-      # in the :scope field (acknowledged issue in developer preview).
-      #
-      # Returns [<id>: <resource>]
-      def apps_permissions_users_list(user=nil)
-        return {} unless is_not_excluded? && is_app_token?  # && !skip_info?
-        # semaphore.synchronize {
-        #   @apps_permissions_users_list ||= access_token.apps_permissions_users_list
-        #   user_id ? @apps_permissions_users_list[user_id].to_h['scopes'] : @apps_permissions_users_list
-        # }
-        access_token.apps_permissions_users_list(user)
-      end
-      
+
       # Is this a workspace app token?
       def is_app_token?
         access_token.is_app_token?
@@ -484,25 +446,6 @@ module OmniAuth
         access_token.has_scope?(scope_query, opts)
       end
       
-      
-      data_method :demo_dsl do
-        scope classic:'identity.basic', identity:'identity:read:user'
-        scope team:'conversations:read', app_home:'chat:write'
-        storage false
-        condition proc{ true }
-        condition proc{ ! false }
-        default_value Hash.new
-        
-        source 'access_token' do
-          get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
-        end
-        
-        source 'self' do
-          "Hi!"
-        end
-      end
-      
-      #@api_methods.to_a.any? || @api_methods = dependencies_flat
     end # Slack
   end # Strategies
 end # OmniAuth

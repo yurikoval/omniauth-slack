@@ -13,9 +13,41 @@ module OmniAuth
     class Mashy < Hashie::Mash
     end
 
-
+    # DataMethods: declarative method dependency management.
+    # 
+    # - Get the most data from the fewest API calls.
+    # - Assign data gateway priority for methods that can pull from multiple gateways.
+    # - Skip a descendant path traversal now, when you know the end point is going to be blocked/down.
+    #
     # Include DataMethods module in your OmniAuth::Strategy class
     # to gain flexible method dependency management.
+    # Control which data_methods get called and in what priority
+    # with the provider block option 'dependencies':
+    #
+    #   provider ...
+    #     dependencies 'my_api_method', 'another_api_method'
+    #   end
+    #
+    # Example data-method declaration in the Strategy class:
+    #
+    # data_method :my_api_method do
+    #   scope classic:'identity.basic', identity:'identity:read:user'
+    #   scope team:'conversations:read', app_home:'chat:write'
+    #   scope_logic: 'or'  # override the default logic (or) within each scope query.
+    #   storage true  # override the name of the cache variable. default is method-name. false disables cache for this method.
+    #   condition proc{ true }
+    #   condition proc{ ! false }
+    #   default_value Hash.new
+    #   source :access_token do
+    #     get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
+    #   end
+    # end
+    #
+    # data_method :user_name do
+    #   source :my_api_method do
+    #     user.name
+    #   end
+    # end
 
     module DataMethods
           
@@ -25,7 +57,10 @@ module OmniAuth
           extend Extensions
           singleton_class.send :attr_reader, :data_methods
           @data_methods ||= Hashy.new
-          option :dependencies, nil
+          option :dependencies, nil  # <string,or,array,of,strings>
+          option :dependency_filter, /.*/  # will be this /^api_/ when all data-methods & dependencies are properly declared.
+          # Experimental, this won't load as early as we'd like.
+          #option :data_method, nil   # <any valid args to Strategy.data_method, as an array>
         end
       end
             
@@ -52,26 +87,38 @@ module OmniAuth
       module Extensions
 
         # List DataMethod instances and their dependencies.
+        # TODO: Try this instead now: data_methods.inject({}){|h,a| k,v = a[0], a[1]; h[k] = v.api_dependencies_hash; h}
         def dependency_tree
-          result = Hashy.new
-          data_methods.each do |key, val|
-            #puts "DataMethods::Extensions.dependencies, data_methods.each, key '#{key}' val-type '#{val.class}'"
-            result[key] = val.source.to_a.map{|s| s[:name].to_s}
-          end
-          result
+          #   result = Hashy.new
+          #   data_methods.each do |key, val|
+          #     #puts "DataMethods::Extensions.dependencies, data_methods.each, key '#{key}' val-type '#{val.class}'"
+          #     result[key] = val.source.to_a.map{|s| s[:name].to_s}
+          #   end
+          #   result
+          data_methods.inject({}){|h,a| k,v = a[0], a[1]; h[k] = v.dependency_hash; h}
         end
 
         # Flatten compiled dependency_tree into an array of uniq strings.
-        def dependencies
-          #dependency_tree.map{|k,v| v}.flatten(-1).inject([]){|a,v| a << v.to_s; a}.uniq
-          deps = dependency_tree.map{|k,v| v}.flatten(-1).inject([]){|a,v| a << v.to_s; a}
-          deps.inject({}){|h, v| h[v] ? h[v] +=1 : h[v] = 1; h}
+        def dependencies(filter = default_options.dependency_filter)
+          dtree = dependency_tree
+          deps  = dtree.values.inject([]){|ary,hsh| ary.concat hsh.keys}
+          meths = dtree.keys.select(){|k| k.to_s[filter]}
+          both = (deps.uniq | meths)
+          #puts({deps: deps, meths: meths, both: both}.to_yaml)
+          
+          #both.inject({}){|h, v| h[v] = deps.count(v.to_s); h}
+          both.inject({}){|h, v| h[v] = deps.count(v.to_s); h}.select{|k,v| k[filter]}
+          
+          #   dependency_tree.values.inject([]) do |ary, d1|
+          #     d1.each {|k,v| ary << k; ary.concat(v.to_a)}
+          #     ary
+          #   end.uniq
         end  
         
         # Which dependencies are missing callable methods.
         def missing_dependencies
           dependencies.keys.select{|m| !method_defined?(m) && !private_method_defined?(m)}
-        end 
+        end
         
         # Build a DataMethod object from a hash or a block.
         def data_method(name, opts = Hashy.new)
@@ -79,9 +126,9 @@ module OmniAuth
           #OmniAuth.logger.log(0, "(slack) Building data_method object (#{name}, #{opts})")
           data_methods[name] = case
             when block_given?
-              DataMethod.new(name, opts, &Proc.new)  #opts.merge!(name: name)
+              DataMethod.new(name, self, opts, &Proc.new)  #opts.merge!(name: name)
             else
-              DataMethod.new(name, opts)  #opts.merge!(name: name)
+              DataMethod.new(name, self, opts)  #opts.merge!(name: name)
           end
           
           define_method(name) do
@@ -98,8 +145,12 @@ module OmniAuth
               when (
                 #log(:debug, "Data method '#{name}' asking has_scope? with '#{method_opts[:scope]}' and opts '#{method_opts[:scope_opts]}'")
                 #(scopes = method_opts[:scope]) && !has_scope?(scopes, method_opts[:scope_opts]) ||
+                # If scopes don't pass.
                 (scopes = method_opts[:scope]) && scopes.any? && !has_scope?(scopes, method_opts[:scope_opts]) ||
-                (conditions = method_opts[:condition]) && !(conditions.is_a?(Proc) ? conditions.call : eval(conditions))
+                # If conditions don't pass.
+                (conditions = method_opts[:condition]) && !(conditions.is_a?(Proc) ? conditions.call : eval(conditions)) #||
+                # If this is an api-method and is not in the compiled dependency list.
+                #name.to_s[/^api_/] && !dependencies.include?(name.to_s)
               )
                 #log(:debug, "Data method '#{name}' returning from unmet scopes or conditions.")
                 #result = method_opts[:default_value]
@@ -108,24 +159,27 @@ module OmniAuth
                 
                 #puts "Data method '#{name}' succeeded scopes & conditions."
                 result = nil
-                dependencies.keys.each do |apim|
-                  sources = method_opts[:source].select{|h| h[:name].to_s == apim.to_s}
-                  #puts "Data method '#{name}' with api_method '#{apim}'"
+                dependencies.each do |dep_name|
+                  sources = method_opts[:source].select{|src| src[:name].to_s == dep_name.to_s }
+                  #sources = method_opts[:source].select{|src| src[:name].to_s == dep_name.to_s || method_opts.api_dependencies_array.include?(dep_name) && !self.class.dependencies.include?(src[:name].to_s)}
+                  #puts "Data method '#{name}' with api_method '#{dep_name}'"
                   sources.each do |source|
                     #puts "Processing source for '#{name}': #{source}"
-                    source_method = source[:name]
+                    source_target = source[:name]
                     source_code = source[:code]
-                    method_result = send source_method
-                    #puts "Data method '#{name}' with source_method '#{source_method}': #{method_result.class}"
+                    target_result = source_target.is_a?(String) ? eval(source_target) : send(source_target)
+                    #puts "Data method '#{name}' with source_target '#{source_target}': #{target_result.class}"
                     
-                    if method_result
+                    if target_result
                       result = case
                         when source_code.is_a?(Proc)
-                          method_result.instance_eval(&source_code)
+                          target_result.instance_eval(&source_code)
                         when source_code.is_a?(String)
-                          method_result.send(:eval, source_code)
+                          target_result.send(:eval, source_code)
+                        when source_code.is_a?(Array)
+                          target_result.send(:eval, source_code.join('.'))
                         when source_code.nil?
-                          method_result
+                          target_result
                         else
                           nil
                       end
@@ -135,7 +189,7 @@ module OmniAuth
                     break if result
                   end # sources.each
                   
-                  #puts "Data method '#{name}' end of dependencies loop '#{apim}': #{result.class}"
+                  #puts "Data method '#{name}' end of dependencies loop '#{dep_name}': #{result.class}"
                   break if result
                 end # dependencies.each
                 
@@ -165,19 +219,21 @@ module OmniAuth
       def self.new(*args)
         opts = Mashy.new(args.last.is_a?(Hash) ? args.pop : {})
         name = args[0].to_s
+        klass = args[1]
         setup_block  = Proc.new if block_given?
         new_object = allocate
         %w(name scope scope_opts condition source storage default_value setup_block info_key).each do |property|
           new_object[property] = nil
         end
         new_object[:name] = name if name
+        new_object[:klass] = klass
         new_object[:setup_block] = setup_block if setup_block
         new_object.merge!(opts)
         new_object.send(:initialize, opts, &setup_block)
         new_object
       end
       
-      def initialize(opts = Hashy.new)
+      def initialize(opts = {})
         OmniAuth.logger.log(0, "(slack) Initialize DataMethod #{self.name}.")
         instance_eval &Proc.new if block_given?
       end
@@ -201,13 +257,18 @@ module OmniAuth
         self[:scope_opts] = opts
       end
       
-      def source(name = nil, opts = Mashy.new)
-        return self[__method__] unless name
+      #def source(name = nil, opts = Mashy.new)
+      def source(*args)
+        return self[__method__] unless args.any?
+        opts = args.last.is_a?(Hash) ? args.pop : Mashy.new
+        name = args.shift
+        code = args if args.any?
+         
         self[:source] ||= Hashie::Array.new
         prc = block_given? ? Proc.new : nil
         #OmniAuth.logger.log(0, "(slack) DataMethod 'source' with (#{name}, #{opts}, #{prc})")
-        source_hash = Mashy.new({name: name}.merge(opts))
-        source_hash[:code] = prc if prc
+        source_hash = Mashy.new({name: name, code: code}.merge(opts))
+        source_hash[:code] = Proc.new if block_given?
         self[:source] << source_hash
       end
       
@@ -230,8 +291,47 @@ module OmniAuth
         #OmniAuth.logger.log(0, "(slack) DataMethod 'default_value' with (#{arg})")
         self[:default_value] = arg
       end
+      
+      # # For example try this: Strategy.data_methods.each{|k,v| puts "#{k}: #{v.api_dependencies(Strategy).inspect}" };nil
+      # def api_dependencies(strategy)
+      #   source.inject([]) do |ary,src|
+      #     # name = d[:name].to_s
+      #     # name[/^api_/] && a << name
+      #     # sub_method = strategy.data_methods[name]
+      #     # sub_method ? a | sub_method.api_dependencies(strategy) : nil
+      #     # a
+      #     ary | source_api_dependencies(src, strategy)
+      #   end
+      # end
+      
+      # Dependencies for this DataMethod instance.
+      # For example try this: Strategy.data_methods.each{|k,v| puts "#{k}: #{v.api_dependencies_array(Strategy).inspect}" };nil
+      def dependency_array
+        source.inject([]) do |ary,src|
+          src_name = src[:name].to_s
+          #src_name[/^api_/] && ary << src_name
+          ary << src_name
+          sub_method = klass.data_methods[src_name]
+          sub_method ? ary | sub_method.dependency_array : ary 
+        end
+      end
+      
+      # Dependency tree for this DataMethod instance.
+      # For example try this: Strategy.data_methods.each{|k,v| puts "#{k}: #{v.api_dependencies_hash(Strategy).inspect}" };nil
+      # or try this: y Strategy.data_methods.inject({}){|h,a| k,v = a[0], a[1]; h[k] = v.api_dependencies_hash(Strategy); h}
+      def dependency_hash
+        source.inject({}) do |hsh,src|
+          ary = []
+          src_name = src[:name].to_s
+          #src_name[/^api_/] && ary << src_name
+          sub_method = klass.data_methods[src_name]
+          hsh[src_name] = sub_method ? ary | sub_method.dependency_array : ary
+          hsh
+        end   
+      end
+              
     end # DataMethod
-  
+
   end # Slack
 end # OmniAuth
 
