@@ -93,6 +93,7 @@ module OmniAuth
       # Strategy instance dependencies.
       def dependencies(filter=nil)
         # If you provide a filter, this will return the master dependency list (filtered).
+        # Otherwise return the user-defined dependencies, or the class-level deps with the user (or default) filter applied.
         raw = if !filter.nil?
           self.class.dependencies(filter).keys
         else
@@ -147,22 +148,17 @@ module OmniAuth
         end
 
         # Strategy class dependencies.
-        # Flatten compiled dependency_tree into an array of uniq strings.
-        def dependencies(filter = /.*/)  #default_options.dependency_filter)
+        # Flattens compiled dependency_tree into an array of uniq strings.
+        # TODO: I think this can be cleaned up.
+        def dependencies(filter = nil)  #default_options.dependency_filter)
+          filter ||= /.*/
           dtree = dependency_tree
           deps  = dtree.values.inject([]){|ary,hsh| ary.concat hsh.keys}
           # TODO: Do we still need this meths list?
           meths = dtree.keys.select(){|k| k.to_s[filter]}
           both = (deps.uniq | meths).sort_with(dtree.keys)
           #puts({deps: deps, meths: meths, both: both}.to_yaml)
-          
-          #both.inject({}){|h, v| h[v] = deps.count(v.to_s); h}
           both.inject({}){|h, v| h[v] = deps.count(v.to_s); h}.select{|k,v| k[filter]}
-          
-          #   dependency_tree.values.inject([]) do |ary, d1|
-          #     d1.each {|k,v| ary << k; ary.concat(v.to_a)}
-          #     ary
-          #   end.uniq
         end  
         
         # Which dependencies are missing callable methods.
