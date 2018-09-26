@@ -86,8 +86,6 @@ module OmniAuth
           @data_methods ||= Hashy.new
           option :dependencies, nil  # <string,or,array,of,strings>
           option :dependency_filter  #, /.*/  # will be this /^api_/ when all data-methods & dependencies are properly declared.
-          # Experimental, this won't load as early as we'd like.
-          #option :data_method, nil   # <any valid args to Strategy.data_method, as an array>
         end
       end
       
@@ -114,7 +112,7 @@ module OmniAuth
       
       def data_methods; self.class.data_methods; end
       
-      # TODO: Consider getting rid of this, or at least not using it for build-in omniauth-slack 'info' keys/values.
+      # TODO: Consider getting rid of this, or at least not using it for built-in omniauth-slack 'info' keys/values.
       #       But keep it around for user-defined data methods that should be attached to the info hash.
       def apply_data_methods(rslt = Hashy.new)
         data_methods.each do |name, opts|
@@ -137,14 +135,7 @@ module OmniAuth
         end
 
         # List DataMethod instances and their dependencies.
-        # TODO: Try this instead now: data_methods.inject({}){|h,a| k,v = a[0], a[1]; h[k] = v.api_dependencies_hash; h}
         def dependency_tree
-          #   result = Hashy.new
-          #   data_methods.each do |key, val|
-          #     #puts "DataMethods::Extensions.dependencies, data_methods.each, key '#{key}' val-type '#{val.class}'"
-          #     result[key] = val.source.to_a.map{|s| s[:name].to_s}
-          #   end
-          #   result
           data_methods.inject({}){|h,a| k,v = a[0], a[1]; h[k] = v.dependency_hash; h}
         end
 
@@ -186,79 +177,53 @@ module OmniAuth
               case
               when ivar_data = instance_variable_get("@#{storage_name}")
                 #log(:debug, "Data method '#{name}' returning stored value: #{ivar_data}.")
-                #return ivar_data
                 result = ivar_data
-            
               when (
                 #log(:debug, "Data method '#{name}' asking has_scope? with '#{method_opts[:scope]}' and opts '#{method_opts[:scope_opts]}'")
-                #(scopes = method_opts[:scope]) && !has_scope?(scopes, method_opts[:scope_opts]) ||
                 # If scopes don't pass.
                 (scopes = method_opts[:scope]) && scopes.any? && !has_scope?(scopes, method_opts[:scope_opts]) ||
                 # If conditions don't pass.
                 (conditions = method_opts[:condition]) && !(conditions.is_a?(Proc) ? conditions.call : eval(conditions)) #||
-                # If this is an api-method and is not in the compiled dependency list.
-                #name.to_s[/^api_/] && !dependencies.include?(name.to_s)
               )
-                #log(:debug, "Data method '#{name}' returning from unmet scopes or conditions.")
-                #result = method_opts[:default_value]
+                #log :debug, "Data method '#{name}' returning from unmet scopes or conditions."
                 result = nil  # see below
               else
-                
                 #log :debug, "Data method '#{name}' succeeded scopes & conditions."
                 result = nil
-                # TODO: Get rid of this dependencies block (see readme-dev).
-                #       Redo this with the sources loop on top, and run thru master deps list only once.
-                #       Logic:
-                #         selected_sources = <source name is in user-deps || source name not in master-deps>
-                #         selected_sources.sort_with(user-deps | master-deps)
-                #         selected_sources.each {execute}
-#                 dependencies(/.*/).each do |dep_name|
-#                   #log(:debug, "Data method '#{name}' with dep_name '#{dep_name}'")
-#                   #sources = method_opts[:source].select{|src| src[:name].to_s == dep_name.to_s }
-#                   #sources = method_opts[:source].select{|src| src[:name].to_s == dep_name.to_s || method_opts.api_dependencies_array.include?(dep_name) && !self.class.dependencies.include?(src[:name].to_s)}
-                  sources = method_opts.source.select do |src|
-                    dependencies.include?(src.name.to_s) || !dependencies(dependency_filter).include?(src.name.to_s)
-                    # dependencies.find
-                    # src.name.to_s == dep_name.to_s ||
-                    # !dependencies(/.*/).include?(src.name.to_s)
-                  # Sorts by master list but puts user-defined list at end.
-                  #end.sort_with((dependencies(/.*/) - dependencies) + dependencies){|v| v.name.to_s}
-                  end.sort_with(dependencies){|v| v[:name].to_s}
-                  #log(:debug, "Data method '#{name}' with selected sources: #{sources.map{|s| s.name}}") if sources.any?
-                  sources.each do |source|
-                    #log(:debug, "Processing source for data-method '#{name}': #{source}")
-                    source_target = source[:name]
-                    source_code = source[:code]
-                    target_result = source_target.is_a?(String) ? eval(source_target) : send(source_target)
-                    #puts "Data method '#{name}' with source_target '#{source_target}': #{target_result.class}"
-                    
-                    if target_result
-                      result = case
-                        when source_code.is_a?(Proc)
-                          target_result.instance_eval(&source_code)
-                        when source_code.is_a?(String)
-                          target_result.send(:eval, source_code)
-                        when source_code.is_a?(Array)
-                          target_result.send(:eval, source_code.join('.'))
-                        when source_code.nil?
-                          target_result
-                        else
-                          nil
-                      end
-                    end # if
-                    
-                    #puts "Data method '#{name}' end of source loop '#{source}': #{result.class}"
-                    break if result
-                  end # sources.each
-#                   
-#                   #puts "Data method '#{name}' end of dependencies loop '#{dep_name}': #{result.class}"
-#                   break if result
-#                 end # dependencies.each
                 
-              end # case
+                sources = method_opts.source.select do |src|
+                  dependencies.include?(src.name.to_s) || !dependencies(dependency_filter).include?(src.name.to_s)
+                end.sort_with(dependencies){|v| v[:name].to_s}
+                #log(:debug, "Data method '#{name}' with selected sources: #{sources.map{|s| s.name}}") if sources.any?
+                sources.each do |source|
+                  #log :debug, "Processing source for data-method '#{name}': #{source}"
+                  source_target = source[:name]
+                  source_code = source[:code]
+                  target_result = source_target.is_a?(String) ? eval(source_target) : send(source_target)
+                  #log :debug, "Data method '#{name}' with source_target '#{source_target}': #{target_result.class}"
+                  
+                  if target_result
+                    result = case
+                      when source_code.is_a?(Proc)
+                        target_result.instance_eval(&source_code)
+                      when source_code.is_a?(String)
+                        target_result.send(:eval, source_code)
+                      when source_code.is_a?(Array)
+                        target_result.send(:eval, source_code.join('.'))
+                      when source_code.nil?
+                        target_result
+                      else
+                        nil
+                    end
+                  end # if
+                  
+                  #log :debug, "Data method '#{name}' end of source loop '#{source}': #{result.class}"
+                  break if result
+                end # sources.each
               
+              end # case
               result ||= method_opts[:default_value]
-              #log(:debug, "Data method '#{name}' returning: #{result}")
+              #log :debug, "Data method '#{name}' returning: #{result}"
               instance_variable_set(("@#{storage_name}"), result) if result && storage_name && method_opts[:storage] != false
               result
               
@@ -275,9 +240,6 @@ module OmniAuth
     #####  DataMethod Class  #####
 
     class DataMethod < Hashy
-      #include Hashie::Extensions::StrictKeyAccess
-      #include Hashie::Extensions::MethodAccessWithOverride
-            
       def self.new(*args)
         opts = Mashy.new(args.last.is_a?(Hash) ? args.pop : {})
         name = args[0].to_s
@@ -319,15 +281,14 @@ module OmniAuth
         self[:scope_opts] = opts
       end
       
-      #def source(name = nil, opts = Mashy.new)
       def source(*args)
         return self[__method__] unless args.any?
         opts = args.last.is_a?(Hash) ? args.pop : Mashy.new
         name = args.shift
         code = args if args.any?
-         
-        self[:source] ||= Hashie::Array.new
         prc = block_given? ? Proc.new : nil
+        
+        self[:source] ||= Hashie::Array.new
         #OmniAuth.logger.log(0, "(slack) DataMethod 'source' with (#{name}, #{opts}, #{prc})")
         source_hash = Mashy.new({name: name, code: code}.merge(opts))
         source_hash[:code] = Proc.new if block_given?
@@ -353,19 +314,7 @@ module OmniAuth
         #OmniAuth.logger.log(0, "(slack) DataMethod 'default_value' with (#{arg})")
         self[:default_value] = arg
       end
-      
-      # # For example try this: Strategy.data_methods.each{|k,v| puts "#{k}: #{v.api_dependencies(Strategy).inspect}" };nil
-      # def api_dependencies(strategy)
-      #   source.inject([]) do |ary,src|
-      #     # name = d[:name].to_s
-      #     # name[/^api_/] && a << name
-      #     # sub_method = strategy.data_methods[name]
-      #     # sub_method ? a | sub_method.api_dependencies(strategy) : nil
-      #     # a
-      #     ary | source_api_dependencies(src, strategy)
-      #   end
-      # end
-      
+
       # Dependencies for this DataMethod instance.
       # For example try this: Strategy.data_methods.each{|k,v| puts "#{k}: #{v.api_dependencies_array(Strategy).inspect}" };nil
       def dependency_array
@@ -393,7 +342,6 @@ module OmniAuth
       end
               
     end # DataMethod
-
   end # Slack
 end # OmniAuth
 
