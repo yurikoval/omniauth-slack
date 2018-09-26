@@ -55,18 +55,23 @@ module OmniAuth
         if num_threads > 0  # && !skip_info?
           preload_data_with_threads(num_threads)
         end
-      
+     
         # Start with only what we can glean from the authorization response.
-        hash = Hash.new
-        apply_data_methods(hash)
-        hash.merge!({ 
-          #name: access_token.user_name,
-          #email: access_token.user_email,
+        hash = OmniAuth::Slack::Hashy.new(
+          name: user_name,
+          email: user_email,
           user_id: user_id,
-          team_name: access_token.team_name,
           team_id: team_id,
-          image: access_token['team'].to_h['image_34']
-        })
+          team_name: team_name,
+          image: image,
+          team_domain: team_domain,
+          team_image: team_image,
+          team_email_domain: team_email_domain,
+          nickname: nickname
+        )
+
+        # Disabled to manually define info.
+        #apply_data_methods(hash)
 
         # Now add everything else, using further calls to the api, if necessary.
         unless skip_info?
@@ -81,52 +86,6 @@ module OmniAuth
             hash[key.to_sym] = api_users_info['user'].to_h[key]
           end
 
-          more_info = {
-            image: (
-              hash[:image] ||
-              user_identity.to_h['image_34'] ||
-              api_users_info['user'].to_h['profile'].to_h['image_34'] ||
-              api_users_profile['profile'].to_h['image_34']
-              ),
-#             name:(
-#               hash[:name] ||
-#               user_identity['name'] ||
-#               user_info['user'].to_h['real_name'] ||
-#               user_profile['profile'].to_h['real_name']
-#               ),
-#             email:(
-#               hash[:email] ||
-#               user_identity.to_h['email'] ||
-#               user_info['user'].to_h['profile'].to_h['email'] ||
-#               user_profile['profile'].to_h['email']
-#               ),
-            team_name:(
-              hash[:team_name] ||
-              team_identity.to_h['name'] ||
-              api_team_info['team'].to_h['name']
-              ),
-            team_domain:(
-              access_token['team'].to_h['domain'] ||
-              team_identity.to_h['domain'] ||
-              api_team_info['team'].to_h['domain']
-              ),
-            team_image:(
-              access_token['team'].to_h['image_34'] ||
-              team_identity.to_h['image_34'] ||
-              api_team_info['team'].to_h['icon'].to_h['image_34']
-              ),
-            team_email_domain:(
-              api_team_info['team'].to_h['email_domain']
-              ),
-            nickname:(
-              api_users_info.to_h['user'].to_h['name'] ||
-              access_token['user'].to_h['name'] ||
-              user_identity.to_h['name']
-              ),
-          }
-          
-          hash.merge!(more_info)
-          
         end
         hash
       end # info
@@ -196,7 +155,7 @@ module OmniAuth
         # Put the raw_info in a place where the Client will update it for each API request.
         new_client.history = raw_info
         
-        log(:debug, "Strategy #{self} using Client #{new_client}")
+        #log(:debug, "Strategy #{self} using Client #{new_client}")
         
         new_client
       end
@@ -330,7 +289,7 @@ module OmniAuth
           {name: :access_token, code: proc{ r = to_hash.select{|k,v| ['user', 'team'].include?(k.to_s)}; r.any? && r} },
           {name: :api_users_identity}
         ]
-              
+                    
       data_method :user_name, info_key: 'name', storage: :user_name, source: [
         {name: 'access_token', code: 'user_name'},
         {name: 'user_identity', code: "fetch('name',nil)"},
@@ -344,6 +303,41 @@ module OmniAuth
         {name: 'api_users_info', code: "fetch('user',{}).to_h['profile'].to_h['email']"},
         {name: 'api_users_profile', code: "fetch('profile',{}).to_h['email']"}
       ]
+      
+      data_method :image do
+        source(:access_token) { self['team'].to_h['image_34'] }
+        source(:user_identity) { to_h['image_34'] }
+        source(:api_users_info) { self['user'].to_h['profile'].to_h['image_34'] }
+        source(:api_users_profile) { self['profile'].to_h['image_34'] }
+      end
+      
+      data_method :team_name do
+        source(:access_token) { team_name }
+        source(:team_identity) { to_h['name'] }
+        source(:api_team_info) { self['team'].to_h['name'] }
+      end
+      
+      data_method :team_domain do
+        source(:access_token) { self['team'].to_h['domain'] }
+        source(:team_identity) { to_h['domain'] }
+        source(:api_team_info) { self['team'].to_h['domain'] }
+      end
+      
+      data_method :team_image do
+        source(:access_token) { self['team'].to_h['image_34'] }
+        source(:team_identity) { to_h['image_34'] }
+        source(:api_team_info) { self['team'].to_h['icon'].to_h['image_34'] }
+      end
+            
+      data_method :team_email_domain do
+        source(:api_team_info) { self['team'].to_h['email_domain'] }
+      end
+            
+      data_method :nickname do
+        source(:api_users_info) { to_h['user'].to_h['name'] }
+        source(:access_token) { self['user'].to_h['name'] }
+        source(:user_identity) { to_h['name'] }
+      end
 
       data_method :api_users_identity,
         scope: {classic:'identity.basic', identity:'identity:read:user'},
@@ -391,15 +385,7 @@ module OmniAuth
       # in the :scope field (acknowledged issue in developer preview).
       #
       # Returns [<id>: <resource>]
-      # def apps_permissions_users_list(user=nil)
-      #   return {} unless is_not_excluded? && is_app_token?  # && !skip_info?
-      #   # semaphore.synchronize {
-      #   #   @apps_permissions_users_list ||= access_token.apps_permissions_users_list
-      #   #   user_id ? @apps_permissions_users_list[user_id].to_h['scopes'] : @apps_permissions_users_list
-      #   # }
-      #   access_token.apps_permissions_users_list(user)
-      # end
-      
+      #      
       data_method :api_apps_permissions_users_list do
         condition -> { is_app_token? }
         source :access_token, 'apps_permissions_users_list(user)'

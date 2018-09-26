@@ -199,7 +199,7 @@ module OmniAuth
                 end.sort_with(dependencies){|v| v[:name].to_s}
                 #log(:debug, "Data method '#{name}' with selected sources: #{sources.map{|s| s.name}}") if sources.any?
                 sources.each do |source|
-                  #log :debug, "Processing source for data-method '#{name}': #{source}"
+                  #log :debug, "DataMethod '#{name}' calling '#{source.name}'"
                   source_target = source[:name]
                   source_code = source[:code]
                   target_result = source_target.is_a?(String) ? eval(source_target) : send(source_target)
@@ -220,7 +220,7 @@ module OmniAuth
                     end
                   end # if
                   
-                  #log :debug, "Data method '#{name}' end of source loop '#{source}': #{result.class}"
+                  log :debug, "DataMethod '#{name}' called '#{source.name}' with result '#{result.class}'"
                   break if result
                 end # sources.each
               

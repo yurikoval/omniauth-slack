@@ -18,7 +18,7 @@ module OmniAuth
         # Override the OAuth2::Client#get_token to pass in the omniauth-slack AccessToken.
         def get_token(params, access_token_opts = {}, access_token_class = OmniAuth::Slack::OAuth2::AccessToken) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
           rslt = super(params, access_token_opts, access_token_class)
-          logger.debug "(slack) Client #{self} using AccessToken #{rslt}"
+          #logger.debug "(slack) Client #{self} using AccessToken #{rslt}"
           rslt
         end
         
