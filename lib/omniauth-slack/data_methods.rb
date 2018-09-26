@@ -2,23 +2,24 @@ require 'hashie'
 
 module RefineArray
   refine Array do
-    
-    # Sort this array according to other-array.
+    # Sort this array according to other-array's current order.
     # See https://stackoverflow.com/questions/44536537/sort-the-array-with-reference-to-another-array
-    def sort_with(reference_array)
-      # sort_by{|x| reference_array.index x.object_id}
-      
-      # This also handles items not in the reference_array.
-      # Pass a block to specify exactly which part of value in array is being used for sort
-      # Example: sources.sort_with(dependencies){|v| v.name.to_s}
+    # This also handles items not in the reference_array.
+    # Pass :beginning or :ending as the 2nd arg to specify where to put unmatched source items.
+    # Pass a block to specify exactly which part of source value is being used for sort.
+    # Example: sources.sort_with(dependencies){|v| v.name.to_s}
+    def sort_with(reference_array, unmatched = :beginning)
       ref_index = reference_array.to_a.each_with_index.to_h
-      #puts "Sorting array #{self} with other's reference index #{ref_index}"
-      # This puts unmatched source items at the end of the result.
-      #sort_by { |v| [ref_index[block_given? ? yield(v) : v] || reference_array.size, v] }
-      # This puts unmatched source items at the beginning of the result.
+      unmatched_destination = case unmatched
+      when /begin/; -1
+      when /end/; 1
+      when Integer; unmatched
+      else -1
+      end
+      #puts "Sorting array #{self} with unmatched_destination '#{unmatched_destination}' and reference index #{ref_index}"
       sort_by do |v|
         val = block_given? ? yield(v) : v
-        [ref_index[val] || -reference_array.size, val]
+        [ref_index[val] || (unmatched_destination * reference_array.size), val]
       end
     end
   end
@@ -130,9 +131,9 @@ module OmniAuth
       module Extensions
       
         # TODO: Temp for debugging
-        def sort_with(a1, a2)
+        def sort_with(a1, a2, unmatched=:beginning)
           prc = Proc.new if block_given?
-          a1.sort_with(a2, &prc)
+          a1.sort_with(a2, unmatched, &prc)
         end
 
         # List DataMethod instances and their dependencies.
@@ -225,7 +226,7 @@ module OmniAuth
                   end.sort_with(dependencies){|v| v[:name].to_s}
                   #log(:debug, "Data method '#{name}' with selected sources: #{sources.map{|s| s.name}}") if sources.any?
                   sources.each do |source|
-                    log(:debug, "Processing source for data-method '#{name}': #{source}")
+                    #log(:debug, "Processing source for data-method '#{name}': #{source}")
                     source_target = source[:name]
                     source_code = source[:code]
                     target_result = source_target.is_a?(String) ? eval(source_target) : send(source_target)
