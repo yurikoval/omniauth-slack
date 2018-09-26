@@ -2,18 +2,29 @@ require 'hashie'
 
 module RefineArray
   refine Array do
+    
+    # Sort this array according to other-array.
+    # See https://stackoverflow.com/questions/44536537/sort-the-array-with-reference-to-another-array
     def sort_with(reference_array)
       # sort_by{|x| reference_array.index x.object_id}
       
-      # This handles items not in the reference_array
-      ai = reference_array.each_with_index.to_h
-      sort_by { |e| [ai[e] || reference_array.size, e] }
+      # This also handles items not in the reference_array.
+      # Pass a block to specify exactly which part of value in array is being used for sort
+      # Example: sources.sort_with(dependencies){|v| v.name.to_s}
+      ref_index = reference_array.to_a.each_with_index.to_h
+      #puts "Sorting array #{self} with other's reference index #{ref_index}"
+      # This puts unmatched source items at the end of the result.
+      #sort_by { |v| [ref_index[block_given? ? yield(v) : v] || reference_array.size, v] }
+      # This puts unmatched source items at the beginning of the result.
+      sort_by do |v|
+        val = block_given? ? yield(v) : v
+        [ref_index[val] || -reference_array.size, val]
+      end
     end
   end
 end
 
 using RefineArray
-
 
 module OmniAuth
   module Slack
@@ -73,18 +84,25 @@ module OmniAuth
           singleton_class.send :attr_reader, :data_methods
           @data_methods ||= Hashy.new
           option :dependencies, nil  # <string,or,array,of,strings>
-          option :dependency_filter, /.*/  # will be this /^api_/ when all data-methods & dependencies are properly declared.
+          option :dependency_filter  #, /.*/  # will be this /^api_/ when all data-methods & dependencies are properly declared.
           # Experimental, this won't load as early as we'd like.
           #option :data_method, nil   # <any valid args to Strategy.data_method, as an array>
         end
       end
-            
+      
+      # Strategy instance dependencies.
       def dependencies(filter=nil)
         # If you provide a filter, this will return the master dependency list (filtered).
-        if filter
+        raw = if !filter.nil?
           self.class.dependencies(filter).keys
         else
           options.dependencies || @dependencies ||= self.class.dependencies(dependency_filter).keys
+        end
+        
+        case raw
+        when String; eval(raw)
+        when Proc; instance_eval(&raw)
+        else raw
         end
       end
       
@@ -109,6 +127,12 @@ module OmniAuth
 
 
       module Extensions
+      
+        # TODO: Temp for debugging
+        def sort_with(a1, a2)
+          prc = Proc.new if block_given?
+          a1.sort_with(a2, &prc)
+        end
 
         # List DataMethod instances and their dependencies.
         # TODO: Try this instead now: data_methods.inject({}){|h,a| k,v = a[0], a[1]; h[k] = v.api_dependencies_hash; h}
@@ -122,12 +146,14 @@ module OmniAuth
           data_methods.inject({}){|h,a| k,v = a[0], a[1]; h[k] = v.dependency_hash; h}
         end
 
+        # Strategy class dependencies.
         # Flatten compiled dependency_tree into an array of uniq strings.
-        def dependencies(filter = default_options.dependency_filter)
+        def dependencies(filter = /.*/)  #default_options.dependency_filter)
           dtree = dependency_tree
           deps  = dtree.values.inject([]){|ary,hsh| ary.concat hsh.keys}
+          # TODO: Do we still need this meths list?
           meths = dtree.keys.select(){|k| k.to_s[filter]}
-          both = (deps.uniq | meths)
+          both = (deps.uniq | meths).sort_with(dtree.keys)
           #puts({deps: deps, meths: meths, both: both}.to_yaml)
           
           #both.inject({}){|h, v| h[v] = deps.count(v.to_s); h}
@@ -181,7 +207,7 @@ module OmniAuth
                 result = nil  # see below
               else
                 
-                puts "Data method '#{name}' succeeded scopes & conditions."
+                #log :debug, "Data method '#{name}' succeeded scopes & conditions."
                 result = nil
                 # TODO: Get rid of this dependencies block (see readme-dev).
                 #       Redo this with the sources loop on top, and run thru master deps list only once.
@@ -189,17 +215,21 @@ module OmniAuth
                 #         selected_sources = <source name is in user-deps || source name not in master-deps>
                 #         selected_sources.sort_with(user-deps | master-deps)
                 #         selected_sources.each {execute}
-                dependencies(/.*/).each do |dep_name|
-                  #log(:debug, "Data method '#{name}' with dep_name '#{dep_name}'")
-                  #sources = method_opts[:source].select{|src| src[:name].to_s == dep_name.to_s }
-                  #sources = method_opts[:source].select{|src| src[:name].to_s == dep_name.to_s || method_opts.api_dependencies_array.include?(dep_name) && !self.class.dependencies.include?(src[:name].to_s)}
-                  sources = method_opts[:source].select do |src|
-                    src.name.to_s == dep_name.to_s ||
-                    !dependencies(/.*/).include?(src.name.to_s)
-                  end
-                  log(:debug, "Data method '#{name}' with dep_name '#{dep_name}' with selected sources: #{sources}") if sources.any?
+#                 dependencies(/.*/).each do |dep_name|
+#                   #log(:debug, "Data method '#{name}' with dep_name '#{dep_name}'")
+#                   #sources = method_opts[:source].select{|src| src[:name].to_s == dep_name.to_s }
+#                   #sources = method_opts[:source].select{|src| src[:name].to_s == dep_name.to_s || method_opts.api_dependencies_array.include?(dep_name) && !self.class.dependencies.include?(src[:name].to_s)}
+                  sources = method_opts.source.select do |src|
+                    dependencies.include?(src.name.to_s) || !dependencies(dependency_filter).include?(src.name.to_s)
+                    # dependencies.find
+                    # src.name.to_s == dep_name.to_s ||
+                    # !dependencies(/.*/).include?(src.name.to_s)
+                  # Sorts by master list but puts user-defined list at end.
+                  #end.sort_with((dependencies(/.*/) - dependencies) + dependencies){|v| v.name.to_s}
+                  end.sort_with(dependencies){|v| v[:name].to_s}
+                  #log(:debug, "Data method '#{name}' with selected sources: #{sources.map{|s| s.name}}") if sources.any?
                   sources.each do |source|
-                    #puts "Processing source for '#{name}': #{source}"
+                    log(:debug, "Processing source for data-method '#{name}': #{source}")
                     source_target = source[:name]
                     source_code = source[:code]
                     target_result = source_target.is_a?(String) ? eval(source_target) : send(source_target)
@@ -223,10 +253,10 @@ module OmniAuth
                     #puts "Data method '#{name}' end of source loop '#{source}': #{result.class}"
                     break if result
                   end # sources.each
-                  
-                  #puts "Data method '#{name}' end of dependencies loop '#{dep_name}': #{result.class}"
-                  break if result
-                end # dependencies.each
+#                   
+#                   #puts "Data method '#{name}' end of dependencies loop '#{dep_name}': #{result.class}"
+#                   break if result
+#                 end # dependencies.each
                 
               end # case
               

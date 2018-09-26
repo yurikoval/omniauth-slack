@@ -25,6 +25,7 @@ module OmniAuth
       option :exclude_data, []
       option :additional_data, {}
       #option :dependencies, nil
+      option :dependency_filter, /^api_/
 
       option :client_options, {
         site: 'https://slack.com',
@@ -299,6 +300,29 @@ module OmniAuth
         end
       end
 
+      def user_id
+        # access_token['user_id'] || access_token['user'].to_h['id'] || access_token['authorizing_user'].to_h['user_id']
+        access_token.user_id
+      end
+      
+      def team_id
+        # access_token['team_id'] || access_token['team'].to_h['id']
+        access_token.team_id
+      end
+
+      def user_identity
+        @user_identity ||= identity['user'].to_h
+      end
+
+      def team_identity
+        @team_identity ||= identity['team'].to_h
+      end
+
+      def web_hook_info
+        #return {} unless access_token.key? 'incoming_webhook'
+        access_token['incoming_webhook']
+      end
+
       data_method :identity,
         storage: :identity,
         default_value: {},
@@ -307,6 +331,20 @@ module OmniAuth
           {name: :access_token, code: proc{ r = to_hash.select{|k,v| ['user', 'team'].include?(k.to_s)}; r.any? && r} },
           {name: :api_users_identity}
         ]
+              
+      data_method :user_name, info_key: 'name', storage: :user_name, source: [
+        {name: 'access_token', code: 'user_name'},
+        {name: 'user_identity', code: "fetch('name',nil)"},
+        {name: 'api_users_info', code: "fetch('user',{}).to_h['real_name']"},
+        {name: 'api_users_profile', code: "fetch('profile',{}).to_h['real_name']"}
+      ]
+      
+      data_method :user_email, info_key: 'email', storage: :user_email, source: [
+        {name: 'access_token', code: "user_email"},
+        {name: 'user_identity', code: "fetch('email',nil)"},
+        {name: 'api_users_info', code: "fetch('user',{}).to_h['profile'].to_h['email']"},
+        {name: 'api_users_profile', code: "fetch('profile',{}).to_h['email']"}
+      ]
 
       data_method :api_users_identity,
         scope: {classic:'identity.basic', identity:'identity:read:user'},
@@ -349,7 +387,6 @@ module OmniAuth
         end
       end
       
-      
       # API call to get user permissions for workspace token.
       # This is needed because workspace token 'sign-in-with-slack' is missing scopes
       # in the :scope field (acknowledged issue in developer preview).
@@ -367,44 +404,7 @@ module OmniAuth
       data_method :api_apps_permissions_users_list do
         condition -> { is_app_token? }
         source :access_token, 'apps_permissions_users_list(user)'
-      end
-              
-      data_method :user_name, info_key: 'name', storage: :user_name, source: [
-        {name: 'access_token', code: 'user_name'},
-        {name: 'user_identity', code: "fetch('name',nil)"},
-        {name: 'api_users_info', code: "fetch('user',{}).to_h['real_name']"},
-        {name: 'api_users_profile', code: "fetch('profile',{}).to_h['real_name']"}
-      ]
-      
-      data_method :user_email, info_key: 'email', storage: :user_email, source: [
-        {name: 'access_token', code: "user_email"},
-        {name: 'user_identity', code: "fetch('email',nil)"},
-        {name: 'api_users_info', code: "fetch('user',{}).to_h['profile'].to_h['email']"},
-        {name: 'api_users_profile', code: "fetch('profile',{}).to_h['email']"}
-      ]
-            
-      def user_id
-        # access_token['user_id'] || access_token['user'].to_h['id'] || access_token['authorizing_user'].to_h['user_id']
-        access_token.user_id
-      end
-      
-      def team_id
-        # access_token['team_id'] || access_token['team'].to_h['id']
-        access_token.team_id
-      end
-
-      def user_identity
-        @user_identity ||= identity['user'].to_h
-      end
-
-      def team_identity
-        @team_identity ||= identity['team'].to_h
-      end
-
-      def web_hook_info
-        #return {} unless access_token.key? 'incoming_webhook'
-        access_token['incoming_webhook']
-      end      
+      end 
 
       # This hash is handed to the access-token, which in turn fills it with API response objects.
       def raw_info
