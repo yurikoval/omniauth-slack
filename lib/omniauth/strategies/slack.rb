@@ -24,7 +24,6 @@ module OmniAuth
       option :include_data, []
       option :exclude_data, []
       option :additional_data, {}
-      #option :dependencies, nil
       option :dependency_filter, /^api_/
 
       option :client_options, {

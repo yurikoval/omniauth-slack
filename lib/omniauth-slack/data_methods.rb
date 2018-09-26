@@ -1,4 +1,5 @@
 require 'hashie'
+require 'omniauth'
 
 module RefineArray
   refine Array do
@@ -84,8 +85,10 @@ module OmniAuth
           extend Extensions
           singleton_class.send :attr_reader, :data_methods
           @data_methods ||= Hashy.new
-          option :dependencies, nil  # <string,or,array,of,strings>
-          option :dependency_filter  #, /.*/  # will be this /^api_/ when all data-methods & dependencies are properly declared.
+          if self.is_a? OmniAuth::Strategy
+            option :dependencies, nil  # <string,or,array,of,strings>
+            option :dependency_filter  #, /.*/  # will be this /^api_/ when all data-methods & dependencies are properly declared.
+          end
         end
       end
       
