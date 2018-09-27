@@ -140,6 +140,7 @@ module OmniAuth
 
         # List DataMethod instances and their dependencies.
         def dependency_tree
+          return {} unles data_methods.to_h.any?
           data_methods.inject({}){|h,a| k,v = a[0], a[1]; h[k] = v.dependency_hash; h}
         end
 
@@ -326,6 +327,7 @@ module OmniAuth
       # Dependencies for this DataMethod instance.
       # For example try this: Strategy.data_methods.each{|k,v| puts "#{k}: #{v.api_dependencies_array(Strategy).inspect}" };nil
       def dependency_array
+        return [] unless source
         source.inject([]) do |ary,src|
           src_name = src[:name].to_s
           #src_name[/^api_/] && ary << src_name
@@ -339,6 +341,7 @@ module OmniAuth
       # For example try this: Strategy.data_methods.each{|k,v| puts "#{k}: #{v.api_dependencies_hash(Strategy).inspect}" };nil
       # or try this: y Strategy.data_methods.inject({}){|h,a| k,v = a[0], a[1]; h[k] = v.api_dependencies_hash(Strategy); h}
       def dependency_hash
+        return {} unless source
         source.inject({}) do |hsh,src|
           ary = []
           src_name = src[:name].to_s
