@@ -21,8 +21,8 @@ module OmniAuth
       option :authorize_options, AUTH_OPTIONS - %w(team_domain)
       option :pass_through_params, []
       option :preload_data_with_threads, 0
-      option :include_data, []
-      option :exclude_data, []
+      # option :include_data, []
+      # option :exclude_data, []
       option :additional_data, {}
       option :dependency_filter, /^api_/
 
@@ -51,9 +51,9 @@ module OmniAuth
       end
 
       info do        
-        num_threads = options.preload_data_with_threads.to_i
-        if num_threads > 0
-          preload_data_with_threads(num_threads, dependencies + options.additional_data.to_h.keys)
+        num_threads, method_names = options.preload_data_with_threads
+        if num_threads.to_i > 0
+          preload_data_with_threads(num_threads.to_i, method_names || dependencies + options.additional_data.to_h.keys)
         end
      
         # Start with only what we can glean from the authorization response.

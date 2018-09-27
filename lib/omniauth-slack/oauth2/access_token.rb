@@ -74,7 +74,7 @@ module OmniAuth
             @all_scopes = (
               scopes = case
                 when params['scope']
-                  {'classic' => params['scope'].split(/[, ]/)}
+                  {'classic' => params['scope'].split(/[, ]+/)}
                 when params['scopes']
                   params['scopes']
                 when is_app_token?
@@ -134,7 +134,7 @@ module OmniAuth
   
             query.send(logic[:inner]) do |section, scopes|
               test_scopes = case
-                when scopes.is_a?(String); scopes.split(/[, ]/)
+                when scopes.is_a?(String); scopes.split(/[, ]+/)
                 when scopes.is_a?(Array); scopes
                 else raise "Scope data must be a string or array or strings, like this {team: 'chat:write,team:read', channels: ['channels:read', 'chat:write']}"
               end

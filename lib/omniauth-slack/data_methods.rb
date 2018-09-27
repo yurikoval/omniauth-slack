@@ -132,11 +132,15 @@ module OmniAuth
       end
       
       # Preload api calls with a pool of threads.
-      def preload_data_with_threads(num_threads, method_names=[])
+      def preload_data_with_threads(num_threads=1, method_names=dependencies)
         return unless num_threads > 0 && !@preloaded_data
         @preloaded_data = 1
         #preload_methods = method_names || dependencies + options.additional_data.to_h.keys
-        preload_methods = method_names
+        preload_methods = case method_names
+          when String; method_names.split(/[, ]+/)
+          when Array; method_names
+          else []
+        end
         log :info, "Preloading (#{preload_methods.size}) methods with (#{num_threads}) threads."
         work_q = Queue.new
         preload_methods.each{|x| work_q.push x }
