@@ -402,6 +402,7 @@ module OmniAuth
         scope_opts = self.scope_opts
         name = self.name
         
+        # TODO: Move this inst-eval down to encompass just the core of this function.
         strategy.instance_eval do
           semaphore(name).synchronize do
             
@@ -409,7 +410,7 @@ module OmniAuth
             when ivar_data = instance_variable_get("@#{storage_name}")
               #log(:debug, "Data method '#{name}' returning stored value: #{ivar_data}.")
               result = ivar_data
-            when (scopes = data_method[:scope]) && scopes.any? && !has_scope?(scopes, scope_opts)
+            when (scopes = data_method.scope) && scopes.any? && !has_scope?(scopes, scope_opts)
               result = nil
             when !data_method.resolve_conditions(self)
               result = nil  # see below
@@ -417,14 +418,14 @@ module OmniAuth
               #log :debug, "Data method '#{name}' succeeded scopes & conditions."
               result = nil
               
-              sources = data_method.source.select do |src|
+              selected_sources = data_method.source.select do |src|
                 dependencies.include?(src.name.to_s) || !dependencies(dependency_filter).include?(src.name.to_s)
-              end.sort_with(dependencies){|v| v[:name].to_s}
+              end.sort_with(dependencies){|v| v.name.to_s}
               #log(:debug, "Data method '#{name}' with selected sources: #{sources.map{|s| s.name}}") if sources.any?
-              sources.each do |source|
-                #log :debug, "DataMethod '#{name}' calling '#{source.name}'"
-                source_target = source[:name]
-                source_code = source[:code]
+              selected_sources.each do |src|
+                #log :debug, "DataMethod '#{name}' calling '#{src.name}'"
+                source_target = src.name
+                source_code = src.code
                 target_result = source_target.is_a?(String) ? eval(source_target) : send(source_target)
                 #log :debug, "Data method '#{name}' with source_target '#{source_target}': #{target_result.class}"
                 
@@ -448,9 +449,9 @@ module OmniAuth
               end # sources.each
             
             end # case
-            result ||= data_method[:default_value]
+            result ||= data_method.default_value
             #log :debug, "Data method '#{name}' returning: #{result}"
-            instance_variable_set(("@#{storage_name}"), result) if result && storage_name && data_method[:storage] != false
+            instance_variable_set(("@#{storage_name}"), result) if result && storage_name && data_method.storage != false
             result
             
           end # semaphore.synchronize
