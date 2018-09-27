@@ -80,10 +80,11 @@ module OmniAuth
     module DataMethods
           
       def self.included(other)
-        #OmniAuth.logger.log(0, "#{other} included #{self}")
+        OmniAuth.logger.debug "#{other} included #{self}"
         other.instance_eval do
           extend Extensions
-          singleton_class.send :attr_reader, :data_methods
+          singleton_class.send :attr_reader, :data_methods, :logger
+          @logger = OmniAuth.logger
           @data_methods ||= Hashy.new
           if self.is_a? OmniAuth::Strategy
             option :dependencies, nil  # <string,or,array,of,strings>
@@ -152,7 +153,6 @@ module OmniAuth
           # TODO: Do we still need this meths list?
           meths = dtree.keys.select(){|k| k.to_s[filter]}
           both = (deps.uniq | meths).sort_with(dtree.keys)
-          #puts({deps: deps, meths: meths, both: both}.to_yaml)
           both.inject({}){|h, v| h[v] = deps.count(v.to_s); h}.select{|k,v| k[filter]}
         end  
         
@@ -163,8 +163,8 @@ module OmniAuth
         
         # Build a DataMethod object from a hash or a block.
         def data_method(name, opts = Hashy.new)
+          #logger.debug "(slack) Building data_method object (#{name}, #{opts})"
           
-          #OmniAuth.logger.log(0, "(slack) Building data_method object (#{name}, #{opts})")
           data_methods[name] = case
             when block_given?
               DataMethod.new(name, self, opts, &Proc.new)  #opts.merge!(name: name)
@@ -220,7 +220,7 @@ module OmniAuth
                     end
                   end # if
                   
-                  log :debug, "DataMethod '#{name}' called '#{source.name}' with result '#{result.class}'"
+                  log :debug, "DataMethod '#{name}' called ('#{source.name}', '#{source_code.class}') with result '#{result.class}'"
                   break if result
                 end # sources.each
               
@@ -261,8 +261,12 @@ module OmniAuth
       end
       
       def initialize(opts = {})
-        OmniAuth.logger.log(0, "(slack) Initialize DataMethod #{self.name}.")
+        log :debug, "Initialize #{self.name}."
         instance_eval &Proc.new if block_given?
+      end
+      
+      def log(type, text)
+        klass.logger.send(type, "(#{klass.name.split('::').last.downcase} data_method) #{text}") if klass.respond_to?(:logger)
       end
       
       # Expects same args as AccessToken#has_scope?
@@ -271,7 +275,7 @@ module OmniAuth
       def scope(*args)
         return self[__method__] unless args.any?
         self[:scope] ||= []
-        #OmniAuth.logger.log(0, "(slack) DataMethod 'scope' with (#{opts})")
+        #log :debug, "Declaring #{name}.scope: #{args}"
         query = args.shift
         opts = args.last
         self[:scope_opts] = opts if opts
@@ -281,6 +285,7 @@ module OmniAuth
       
       def scope_opts(opts={})
         return self[__method__] unless opts && opts.any?
+        #log :debug, "Declaring #{name}.scope_opts: #{opts}"
         self[:scope_opts] = opts
       end
       
@@ -292,7 +297,7 @@ module OmniAuth
         prc = block_given? ? Proc.new : nil
         
         self[:source] ||= Hashie::Array.new
-        #OmniAuth.logger.log(0, "(slack) DataMethod 'source' with (#{name}, #{opts}, #{prc})")
+        #log :debug, "Declaring #{name}.source: #{name}, #{opts}, #{prc}"
         source_hash = Mashy.new({name: name, code: code}.merge(opts))
         source_hash[:code] = Proc.new if block_given?
         self[:source] << source_hash
@@ -300,7 +305,7 @@ module OmniAuth
       
       def storage(arg = nil)
         return self[__method__] unless arg
-        #OmniAuth.logger.log(0, "(slack) DataMethod 'storage with (#{arg})")
+        #log :debug, "Declaring #{name}.cache_storage: #{arg}"
         self[:storage] = arg
       end
       
@@ -308,13 +313,13 @@ module OmniAuth
         return self[__method__] unless code
         self[:condition] ||= []
         code = block_given? ? Proc.new : code
-        #OmniAuth.logger.log(0, "(slack) DataMethod 'condition' with (#{code})")
+        #log :debug, "Declaring #{name}.condition: #{code}"
         self[:condition] << code
       end
       
       def default_value(arg = nil)
         return self[__method__] unless arg
-        #OmniAuth.logger.log(0, "(slack) DataMethod 'default_value' with (#{arg})")
+        #log :debug, "Declaring #{name}.default_value: #{arg}"
         self[:default_value] = arg
       end
 
