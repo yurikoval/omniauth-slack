@@ -141,7 +141,7 @@ module OmniAuth
           when Array; method_names
           else []
         end
-        log :info, "Preloading (#{preload_methods.size}) methods with (#{num_threads}) threads."
+        log :info, "Preloading (#{preload_methods.size}) methods with (#{num_threads}) threads"  #: #{preload_methods}"
         work_q = Queue.new
         preload_methods.each{|x| work_q.push x }
         workers = num_threads.to_i.times.map do

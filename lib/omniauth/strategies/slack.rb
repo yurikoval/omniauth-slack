@@ -46,7 +46,7 @@ module OmniAuth
         {
           token_type: access_token['token_type'],
           scope: access_token['scope'],
-          scopes: all_scopes
+          scopes: access_token.all_scopes
         }
       end
 
@@ -327,11 +327,11 @@ module OmniAuth
       #
       # Returns [<id>: <resource>]
       #      
-      data_method :api_apps_permissions_users_list do
-        default_value {}
-        condition proc { is_app_token? }
-        source :access_token, 'apps_permissions_users_list(user_id)'
-      end 
+      # data_method :api_apps_permissions_users_list do
+      #   default_value {}
+      #   condition proc { is_app_token? }
+      #   source :access_token, 'apps_permissions_users_list(user_id)'
+      # end 
 
       # This hash is handed to the access-token, which in turn fills it with API response objects.
       def raw_info
@@ -353,16 +353,16 @@ module OmniAuth
         env['omniauth.authorize_params'].to_h['scope']
       end
       
-      # Scopes come from at least 3 different places now.
-      # * The classic :scope field (string)
-      # * New workshop token :scopes field (hash)
-      # * Call to apps.permissions.users.list (array)
-      #
-      # This returns hash of workspace scopes, with classic & new identity scopes in :identity.
-      # Lists of scopes are in array form.
-      def all_scopes(*args)
-        access_token.all_scopes(*args)
-      end
+      #   # Scopes come from at least 3 different places now.
+      #   # * The classic :scope field (string)
+      #   # * New workshop token :scopes field (hash)
+      #   # * Call to apps.permissions.users.list (array)
+      #   #
+      #   # This returns hash of workspace scopes, with classic & new identity scopes in :identity.
+      #   # Lists of scopes are in array form.
+      #   def all_scopes(*args)
+      #     access_token.all_scopes(*args)
+      #   end
       
       # Determine if given scopes exist in current authorization.
       # scopes_hash is hash where:
