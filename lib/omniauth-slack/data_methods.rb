@@ -130,7 +130,30 @@ module OmniAuth
           rslt
         end
       end
-
+      
+      # Preload additional api calls with a pool of threads.
+      def preload_data_with_threads(num_threads, method_names=[])
+        return unless num_threads > 0 && !@preloaded_data
+        @preloaded_data = 1
+        #preload_methods = method_names || dependencies + options.additional_data.to_h.keys
+        preload_methods = method_names
+        log :info, "Preloading (#{preload_methods.size}) methods with (#{num_threads}) threads."
+        work_q = Queue.new
+        preload_methods.each{|x| work_q.push x }
+        workers = num_threads.to_i.times.map do
+          Thread.new do
+            begin
+              while x = work_q.pop(true)
+                log :debug, "Preloading #{x} in thread #{Thread.current.object_id}."
+                send x
+              end
+            rescue ThreadError
+            end
+          end
+        end
+        workers.map(&:join); "ok"
+      end
+      
 
       module Extensions
       
@@ -176,28 +199,27 @@ module OmniAuth
           end
           
           define_method(name) do
-            method_opts = data_methods[__method__]
-            storage_name = method_opts[:storage] || name
+            data_method = data_methods[__method__]
+            storage_name = data_method[:storage] || name
             
             semaphore(name).synchronize do
+              scope_opts = data_method[:scope_opts] #.merge(
+              #   self.class.ancestors.join(',')[/Strategy/] ? {base_scopes: auth_hash.credentials.scope} : {}
+              # )
+              
               case
               when ivar_data = instance_variable_get("@#{storage_name}")
                 #log(:debug, "Data method '#{name}' returning stored value: #{ivar_data}.")
                 result = ivar_data
-              when (
-                #log(:debug, "Data method '#{name}' asking has_scope? with '#{method_opts[:scope]}' and opts '#{method_opts[:scope_opts]}'")
-                # If scopes don't pass.
-                (scopes = method_opts[:scope]) && scopes.any? && !has_scope?(scopes, method_opts[:scope_opts]) ||
-                # If conditions don't pass.
-                (conditions = method_opts[:condition]) && !(conditions.is_a?(Proc) ? conditions.call : eval(conditions)) #||
-              )
-                #log :debug, "Data method '#{name}' returning from unmet scopes or conditions."
+              when (scopes = data_method[:scope]) && scopes.any? && !has_scope?(scopes, scope_opts)
+                result = nil
+              when !data_method.resolve_conditions(self)
                 result = nil  # see below
               else
                 #log :debug, "Data method '#{name}' succeeded scopes & conditions."
                 result = nil
                 
-                sources = method_opts.source.select do |src|
+                sources = data_method.source.select do |src|
                   dependencies.include?(src.name.to_s) || !dependencies(dependency_filter).include?(src.name.to_s)
                 end.sort_with(dependencies){|v| v[:name].to_s}
                 #log(:debug, "Data method '#{name}' with selected sources: #{sources.map{|s| s.name}}") if sources.any?
@@ -223,14 +245,14 @@ module OmniAuth
                     end
                   end # if
                   
-                  log :debug, "DataMethod '#{name}' called ('#{source.name}', '#{source_code.class}') with result '#{result.class}'"
+                  #log :debug, "DataMethod '#{name}' called ('#{source.name}', '#{source_code.class}') with result '#{result.class}'"
                   break if result
                 end # sources.each
               
               end # case
-              result ||= method_opts[:default_value]
+              result ||= data_method[:default_value]
               #log :debug, "Data method '#{name}' returning: #{result}"
-              instance_variable_set(("@#{storage_name}"), result) if result && storage_name && method_opts[:storage] != false
+              instance_variable_set(("@#{storage_name}"), result) if result && storage_name && data_method[:storage] != false
               result
               
             end # semaphore.synchronize
@@ -352,6 +374,18 @@ module OmniAuth
           hsh[src_name] = sub_method ? ary | sub_method.dependency_array : ary
           hsh
         end   
+      end
+      
+      def resolve_conditions(strategy, conditions = condition)
+        return true unless conditions
+        rslt = case conditions
+          when Proc; strategy.instance_eval &conditions
+          when String; strategy.eval(conditions)
+          when Array; conditions.all? {|c| resolve_conditions(strategy, c)}
+          else true
+        end ? true : false
+        log :debug, "#{name} resolve_conditions result '#{rslt}'"
+        rslt
       end
               
     end # DataMethod
