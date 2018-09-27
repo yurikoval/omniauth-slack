@@ -44,15 +44,15 @@ module OmniAuth
         end
       
         # Parsed identity scopes (workspace apps only).
-        def apps_permissions_users_list(user=nil)
-          #raise StandardError, "APUL caller #{caller[0][/`([^']*)'/, 1]} user #{user}"
+        def apps_permissions_users_list(_user_id=nil)
+          #raise StandardError, "APUL caller #{caller[0][/`([^']*)'/, 1]} user #{_user_id}"
           return {} unless is_app_token?
           semaphore.synchronize {
             @apps_permissions_users_list ||= (
               r = get('/api/apps.permissions.users.list').parsed
               r['resources'].to_a.inject({}){|h,i| h[i['id']] = i; h} || {}
             )
-            user ? @apps_permissions_users_list[user].to_h['scopes'] : @apps_permissions_users_list
+            _user_id ? @apps_permissions_users_list[_user_id].to_h['scopes'] : @apps_permissions_users_list
           }
         end
         
@@ -69,8 +69,8 @@ module OmniAuth
                 
         # Get all scopes, including apps.permissions.users.list if user_id.
         # This now puts all compiled scopes back into params['scopes']
-        def all_scopes(user=nil)
-          if user && !@all_scopes.to_h.has_key?('identity') || @all_scopes.nil?
+        def all_scopes(_user_id=nil)
+          if _user_id && !@all_scopes.to_h.has_key?('identity') || @all_scopes.nil?
             @all_scopes = (
               scopes = case
                 when params['scope']
@@ -81,7 +81,7 @@ module OmniAuth
                   apps_permissions_scopes_list
               end
               
-              scopes['identity'] = apps_permissions_users_list(user) if user && is_app_token?
+              scopes['identity'] = apps_permissions_users_list(_user_id) if _user_id && is_app_token?
               params['scopes'] = scopes
             )
           else

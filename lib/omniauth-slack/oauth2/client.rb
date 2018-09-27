@@ -24,7 +24,7 @@ module OmniAuth
         
         # Log each request and store the result in @history hash.
         def request(*args)
-          logger.debug "(slack) API request #{args[0..1]}"  #; by Client #{self}; in thread #{Thread.current.object_id}.")
+          logger.debug "(slack) API request '#{args[0..1]}' in thread '#{Thread.current.object_id}'."  # by Client '#{self}'
           request_output = super(*args)
           uri = args[1].to_s.gsub(/^.*\/([^\/]+)/, '\1') # use single-quote or double-back-slash for replacement.
           history[uri.to_s] = request_output

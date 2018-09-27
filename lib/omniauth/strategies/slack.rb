@@ -173,50 +173,6 @@ module OmniAuth
       
       private
       
-#       def active_methods
-#         @active_methods ||= (
-#           includes = [options.include_data].flatten.compact
-#           excludes = [options.exclude_data].flatten.compact unless includes.size > 0
-#           method_list = %w(api_apps_permissions_users_list api_users_identity api_users_info api_users_profile api_team_info api_bots_info)  #.concat(options[:additional_data].keys)
-#           if includes.size > 0
-#             method_list.keep_if {|m| includes.include?(m.to_s) || includes.include?(m.to_s.to_sym)}
-#           elsif excludes[0].to_s == 'all'
-#             method_list = []
-#           elsif excludes.size > 0
-#             method_list.delete_if {|m| excludes.include?(m.to_s) || excludes.include?(m.to_s.to_sym)}
-#           end
-#           log :debug, "Activated API calls: #{method_list}."
-#           log :debug, "Activated additional_data calls: #{options.additional_data.keys}."
-#           method_list
-#         )
-#       end
-#       
-#       def is_not_excluded?(method_name = caller[0][/`([^']*)'/, 1])
-#         active_methods.include?(method_name.to_s) || active_methods.include?(method_name.to_s.to_sym)
-#       end
-#       
-#       # Preload additional api calls with a pool of threads.
-#       def preload_data_with_threads(num_threads)
-#         return unless num_threads > 0 && !@preloaded_data
-#         @preloaded_data = 1
-#         preload_methods = active_methods + options.additional_data.to_h.keys
-#         log :info, "Preloading (#{preload_methods.size}) data requests using (#{num_threads}) threads."
-#         work_q = Queue.new
-#         preload_methods.each{|x| work_q.push x }
-#         workers = num_threads.to_i.times.map do
-#           Thread.new do
-#             begin
-#               while x = work_q.pop(true)
-#                 log :debug, "Preloading #{x} in thread #{Thread.current.object_id}."
-#                 send x
-#               end
-#             rescue ThreadError
-#             end
-#           end
-#         end
-#         workers.map(&:join); "ok"
-#       end
-      
       # Define methods for addional data from :additional_data option
       def define_additional_data
         return if @additional_data_defined
@@ -374,7 +330,7 @@ module OmniAuth
       data_method :api_apps_permissions_users_list do
         default_value {}
         condition proc { is_app_token? }
-        source :access_token, 'apps_permissions_users_list(user)'
+        source :access_token, 'apps_permissions_users_list(user_id)'
       end 
 
       # This hash is handed to the access-token, which in turn fills it with API response objects.

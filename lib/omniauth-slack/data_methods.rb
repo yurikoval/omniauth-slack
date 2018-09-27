@@ -131,7 +131,7 @@ module OmniAuth
         end
       end
       
-      # Preload additional api calls with a pool of threads.
+      # Preload api calls with a pool of threads.
       def preload_data_with_threads(num_threads, method_names=[])
         return unless num_threads > 0 && !@preloaded_data
         @preloaded_data = 1
@@ -384,7 +384,7 @@ module OmniAuth
           when Array; conditions.all? {|c| resolve_conditions(strategy, c)}
           else true
         end ? true : false
-        log :debug, "#{name} resolve_conditions result '#{rslt}'"
+        #log :debug, "#{name} resolve_conditions result '#{rslt}'"
         rslt
       end
               
