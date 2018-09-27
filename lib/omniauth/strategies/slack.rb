@@ -173,21 +173,6 @@ module OmniAuth
       
       private
       
-      def initialize(*args)
-        super
-        @main_semaphore = Mutex.new
-        @semaphores = {}
-      end
-      
-      # Get a mutex specific to the calling method.
-      # This operation is synchronized with its own mutex.
-      def semaphore(method_name = caller[0][/`([^']*)'/, 1])
-        #log(:debug, "Synchronizing method #{method_name}.")
-        @main_semaphore.synchronize {
-          @semaphores[method_name] ||= Mutex.new
-        }
-      end
-      
       def active_methods
         @active_methods ||= (
           includes = [options.include_data].flatten.compact

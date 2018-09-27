@@ -1,23 +1,11 @@
 require 'oauth2/access_token'
+require 'omniauth-slack/semaphore'
 
 module OmniAuth
   module Slack
     module OAuth2
       class AccessToken < ::OAuth2::AccessToken
-        
-        def initialize(*args)
-          super
-          @main_semaphore = Mutex.new
-          @semaphores = {}
-        end
-        
-        # Get a mutex specific to the calling method.
-        # This operation is synchronized with its own mutex.
-        def semaphore(method_name = caller[0][/`([^']*)'/, 1])
-          @main_semaphore.synchronize {
-            @semaphores[method_name] ||= Mutex.new
-          }
-        end
+        prepend Semaphore
 
         %w(user_name user_email team_id team_name team_domain).each do |word|
           obj, atrb = word.split('_')

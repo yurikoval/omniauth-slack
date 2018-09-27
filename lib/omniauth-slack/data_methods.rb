@@ -1,5 +1,6 @@
 require 'hashie'
 require 'omniauth'
+require 'omniauth-slack/semaphore'
 
 module RefineArray
   refine Array do
@@ -82,6 +83,7 @@ module OmniAuth
       def self.included(other)
         OmniAuth.logger.debug "#{other} included #{self}"
         other.instance_eval do
+          prepend Semaphore
           extend Extensions
           singleton_class.send :attr_reader, :data_methods, :logger
           @logger = OmniAuth.logger
@@ -140,7 +142,7 @@ module OmniAuth
 
         # List DataMethod instances and their dependencies.
         def dependency_tree
-          return {} unles data_methods.to_h.any?
+          return {} unless data_methods.to_h.any?
           data_methods.inject({}){|h,a| k,v = a[0], a[1]; h[k] = v.dependency_hash; h}
         end
 
