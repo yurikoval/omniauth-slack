@@ -263,7 +263,7 @@ module OmniAuth
           # end # define_method
           
           define_method(name) do
-            data_methods[__method__].call(self)
+            semaphore(name).synchronize { data_methods[__method__].call(self) }
           end
           
           data_methods[name]
@@ -276,6 +276,8 @@ module OmniAuth
     #####  DataMethod Class  #####
 
     class DataMethod < Hashy
+      #prepend Semaphore
+      
       def self.new(*args)
         opts = Mashy.new(args.last.is_a?(Hash) ? args.pop : {})
         name = args[0].to_s
@@ -356,6 +358,8 @@ module OmniAuth
         self[:default_value] = arg
       end
 
+
+
       # Dependencies for this DataMethod instance.
       # For example try this: Strategy.data_methods.each{|k,v| puts "#{k}: #{v.api_dependencies_array(Strategy).inspect}" };nil
       def dependency_array
@@ -384,7 +388,8 @@ module OmniAuth
         end   
       end
       
-      def resolve_conditions(strategy, conditions = condition)
+      def resolve_conditions(strategy)
+        conditions = condition
         return true unless conditions
         rslt = case conditions
           when Proc; strategy.instance_eval &conditions
@@ -396,68 +401,72 @@ module OmniAuth
         rslt
       end
       
-      def call(strategy)
-        data_method = self
-        storage_name = storage || name
-        scope_opts = self.scope_opts
-        name = self.name
+      def resolve_scopes(strategy)
+        scopes = scope
+        (scopes && scopes.any?) ? strategy.send(:has_scope?, scopes, scope_opts) : true
+      end
+      
+      def resolve_source(src, strategy)
+        source_target = src.name
+        source_code = src.code
+        target_result = source_target.is_a?(String) ? strategy.send(:eval, source_target) : strategy.send(source_target)
+        #log :debug, "Data method '#{name}' with source_target '#{source_target}': #{target_result.class}"
         
-        # TODO: Move this inst-eval down to encompass just the core of this function.
-        strategy.instance_eval do
-          semaphore(name).synchronize do
-            
-            case
-            when ivar_data = instance_variable_get("@#{storage_name}")
-              #log(:debug, "Data method '#{name}' returning stored value: #{ivar_data}.")
-              result = ivar_data
-            when (scopes = data_method.scope) && scopes.any? && !has_scope?(scopes, scope_opts)
-              result = nil
-            when !data_method.resolve_conditions(self)
-              result = nil  # see below
+        if target_result
+          result = case
+            when source_code.is_a?(Proc)
+              target_result.instance_eval(&source_code)
+            when source_code.is_a?(String)
+              target_result.send(:eval, source_code)
+            when source_code.is_a?(Array)
+              target_result.send(:eval, source_code.join('.'))
+            when source_code.nil?
+              target_result
             else
-              #log :debug, "Data method '#{name}' succeeded scopes & conditions."
-              result = nil
-              
-              selected_sources = data_method.source.select do |src|
-                dependencies.include?(src.name.to_s) || !dependencies(dependency_filter).include?(src.name.to_s)
-              end.sort_with(dependencies){|v| v.name.to_s}
-              #log(:debug, "Data method '#{name}' with selected sources: #{sources.map{|s| s.name}}") if sources.any?
-              selected_sources.each do |src|
-                #log :debug, "DataMethod '#{name}' calling '#{src.name}'"
-                source_target = src.name
-                source_code = src.code
-                target_result = source_target.is_a?(String) ? eval(source_target) : send(source_target)
-                #log :debug, "Data method '#{name}' with source_target '#{source_target}': #{target_result.class}"
-                
-                if target_result
-                  result = case
-                    when source_code.is_a?(Proc)
-                      target_result.instance_eval(&source_code)
-                    when source_code.is_a?(String)
-                      target_result.send(:eval, source_code)
-                    when source_code.is_a?(Array)
-                      target_result.send(:eval, source_code.join('.'))
-                    when source_code.nil?
-                      target_result
-                    else
-                      nil
-                  end
-                end # if
-                
-                #log :debug, "DataMethod '#{name}' called ('#{source.name}', '#{source_code.class}') with result '#{result.class}'"
-                break if result
-              end # sources.each
+              nil
+          end
+        end
+      end
+      
+      def select_sources(strategy)
+        source = self.source
+        strategy.instance_eval do
+          source.select do |src|
+            dependencies.include?(src.name.to_s) || !dependencies(dependency_filter).include?(src.name.to_s)
+          end.sort_with(dependencies){|v| v.name.to_s}
+        end
+      end
+      
+      def with_cache(strategy, &block)
+        storage_name = storage || name
+        ivar_data = strategy.instance_variable_get("@#{storage_name}")
+        return ivar_data if ivar_data
+        result = yield
+        strategy.instance_variable_set("@#{storage_name}", result) if result && storage_name && storage != false
+        result
+      end
             
-            end # case
-            result ||= data_method.default_value
-            #log :debug, "Data method '#{name}' returning: #{result}"
-            instance_variable_set(("@#{storage_name}"), result) if result && storage_name && data_method.storage != false
-            result
-            
-          end # semaphore.synchronize
-        end # strategy.instance_eval
-      end # call
-
+      def call(strategy)
+        with_cache(strategy) do
+          case
+          when !resolve_scopes(strategy)
+            result = nil
+          when !resolve_conditions(strategy)
+            result = nil  # see below
+          else
+            #log :debug, "Data method '#{name}' succeeded scopes & conditions."
+            result = nil
+            select_sources(strategy).each do |src|
+              result = resolve_source(src, strategy)
+              break if result
+            end
+          end
+          
+          result ||= default_value
+          #log :debug, "Data method '#{name}' returning: #{result}"
+          #result
+        end
+      end
               
     end # DataMethod
   end # Slack

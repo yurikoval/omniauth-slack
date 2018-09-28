@@ -1,3 +1,5 @@
+### Prepend this module to get simple mutexes for each/any method.
+
 module OmniAuth
   module Slack
     module Semaphore
@@ -11,7 +13,7 @@ module OmniAuth
       # Get a mutex specific to the calling method.
       # This operation is synchronized with its own mutex.
       def semaphore(method_name = caller[0][/`([^']*)'/, 1])
-        #OmniAuth.logger.debug "#{self} synchronizing method #{method_name}."
+        #OmniAuth.logger.debug "#{self.class}##{object_id} synchronizing method #{method_name}."
         @main_semaphore.synchronize {
           @semaphores[method_name] ||= Mutex.new
         }
