@@ -16,6 +16,9 @@ module OmniAuth
     
       class AuthHash < OmniAuth::Slack::AuthHash
         # Custom AuthHash has a few enhancements.
+        def initialize(*args)
+          log :debug, "Loading Strategy::AuthHash < OmniAuth::Slack::AuthHash"
+        end
       end
     
       AUTH_OPTIONS = %w(redirect_uri scope team team_domain )
@@ -217,11 +220,11 @@ module OmniAuth
       end
 
       def user_identity
-        @user_identity ||= identity['user'].to_h
+        identity['user'].to_h
       end
 
       def team_identity
-        @team_identity ||= identity['team'].to_h
+        identity['team'].to_h
       end
 
       def web_hook_info
@@ -253,10 +256,10 @@ module OmniAuth
       ]
       
       data_method :image do
-        source(:access_token) { self['team'].to_h['image_34'] }
-        source(:user_identity) { self['image_34'] }
-        source(:api_users_info) { self['user'].to_h['profile'].to_h['image_34'] }
-        source(:api_users_profile) { self['profile'].to_h['image_34'] }
+        source(:access_token) { self['user'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
+        source(:user_identity) { find{|k,v| k.to_s[/image_/]}.to_a[1] }
+        source(:api_users_info) { self['user'].to_h['profile'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
+        source(:api_users_profile) { self['profile'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
       end
       
       data_method :team_name do
@@ -267,18 +270,23 @@ module OmniAuth
       
       data_method :team_domain do
         source(:access_token) { self['team'].to_h['domain'] }
-        #source(:team_identity) { self['domain'] }
-        source(:api_users_identity) { self['user'].to_h['domain'] }
+        source(:team_identity) { self['domain'] }
+        source(:api_users_identity) { self['team'].to_h['domain'] }
         source(:api_team_info) { self['team'].to_h['domain'] }
       end
       
       data_method :team_image do
-        source(:access_token) { self['team'].to_h['image_34'] }
-        source(:team_identity) { self['image_34'] }
-        source(:api_team_info) { self['team'].to_h['icon'].to_h['image_34'] }
+        source(:access_token) { self['team'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
+        source(:team_identity) { find{|k,v| k.to_s[/image_/]}.to_a[1] }
+        source(:api_users_identity) { self['team'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
+        source(:api_team_info) { self['team'].to_h['icon'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
       end
-            
+      
+      # Team_info is apparently the only source for this data,
+      # so it will be called every cycle, regardless of whether the data is there or not.
+      # TODO: Consider disabling this, or add has_scope? capabillties to source objects.
       data_method :team_email_domain do
+        condition { false }
         source(:api_team_info) { self['team'].to_h['email_domain'] }
       end
                   
@@ -326,6 +334,7 @@ module OmniAuth
       
       data_method :api_bots_info do
         scope classic: 'users:read', team: 'users:read'
+        condition { !is_app_token? }
         default_value Hash.new
         source :access_token do
           get('/api/bots.info').parsed

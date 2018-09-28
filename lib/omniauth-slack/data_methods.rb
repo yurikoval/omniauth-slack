@@ -307,14 +307,15 @@ module OmniAuth
       
       def resolve_conditions(strategy)
         conditions = condition
+        log :debug, "Resolve_conditions for data-method '#{name}' with conditions '#{conditions}'"
         return true unless conditions
         rslt = case conditions
           when Proc; strategy.instance_eval &conditions
           when String; strategy.eval(conditions)
           when Array; conditions.all? {|c| resolve_conditions(strategy, c)}
-          else true
+          else conditions
         end ? true : false
-        #log :debug, "#{name} resolve_conditions result '#{rslt}'"
+        #log :debug, "Resolve_conditions for '#{name}' with '#{conditions}' result '#{rslt}'"
         rslt
       end
       
@@ -326,6 +327,7 @@ module OmniAuth
       def resolve_source(src, strategy)
         source_target = src.name
         source_code = src.code
+        log :debug, "Data method '#{name}' calling source_target '#{source_target}' with code '#{source_code}'."
         target_result = source_target.is_a?(String) ? strategy.send(:eval, source_target) : strategy.send(source_target)
         #log :debug, "Data method '#{name}' with source_target '#{source_target}': #{target_result.class}"
         
