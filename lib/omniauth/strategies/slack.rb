@@ -2,24 +2,21 @@ require 'omniauth/strategies/oauth2'
 require 'omniauth-slack/refinements'
 require 'omniauth-slack/slack'
 require 'omniauth-slack/data_methods'
+require 'omniauth-slack/omniauth/auth_hash'
 require 'thread'
 require 'uri'
 
-using OmniAuth::Slack::Refinements
-
 module OmniAuth
-  class AuthHash
-    include Hashie::Extensions::DeepFind
-  end
-end
-
-module OmniAuth
+  #using Slack::OmniAuthRefinements
+  using Slack::OAuth2Refinements
+  
   module Strategies
-    
     class Slack < OmniAuth::Strategies::OAuth2
-      
-      # Experimental
       include OmniAuth::Slack::DataMethods
+    
+      class AuthHash < OmniAuth::Slack::AuthHash
+        # Custom AuthHash has a few enhancements.
+      end
     
       AUTH_OPTIONS = %w(redirect_uri scope team team_domain )
       
@@ -153,8 +150,12 @@ module OmniAuth
       # * Set auth site uri with custom subdomain (if provided).
       #
       def client
-        new_client = super
-                
+        #new_client = super
+        
+        # Simple override to use our custom subclassed OAuth2::Client instead.
+        # The Client.new call is lifted directly from OmniAuth::Strategies::OAuth2.
+        new_client = OmniAuth::Slack::OAuth2::Client.new(options.client_id, options.client_secret, deep_symbolize(options.client_options))
+               
         # Set client#subdomain with custom team_domain, if exists and allowed.
         new_client.subdomain = (pass_through_params.include?('team_domain') && request.params['team_domain']) ? request.params['team_domain'] : options.team_domain
         
@@ -266,7 +267,8 @@ module OmniAuth
       
       data_method :team_domain do
         source(:access_token) { self['team'].to_h['domain'] }
-        source(:team_identity) { self['domain'] }
+        #source(:team_identity) { self['domain'] }
+        source(:api_users_identity) { self['user'].to_h['domain'] }
         source(:api_team_info) { self['team'].to_h['domain'] }
       end
       
@@ -279,7 +281,7 @@ module OmniAuth
       data_method :team_email_domain do
         source(:api_team_info) { self['team'].to_h['email_domain'] }
       end
-            
+                  
       data_method :nickname do
         #source(:api_users_info) { self['user'].to_h['profile'].to_h['display_name'] }
         source(:api_users_info) { deep_find 'display_name' }
@@ -302,7 +304,7 @@ module OmniAuth
         default_value Hash.new
         scope classic: 'users:read', team: 'users:read'
         source :access_token do
-          OmniAuth::AuthHash.new get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
+          get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).to_auth_hash
         end
       end
 
@@ -310,7 +312,7 @@ module OmniAuth
         default_value Hash.new
         scope classic: 'users.profile:read', team: 'users.profile:read'
         source :access_token do
-          OmniAuth::AuthHash.new get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
+          get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).to_auth_hash
         end
       end      
 

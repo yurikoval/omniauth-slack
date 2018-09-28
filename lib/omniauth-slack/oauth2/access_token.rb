@@ -5,7 +5,7 @@ module OmniAuth
   module Slack
     module OAuth2
       class AccessToken < ::OAuth2::AccessToken
-        prepend Semaphore
+        prepend Slack::Semaphore
 
         %w(user_name user_email team_id team_name team_domain).each do |word|
           obj, atrb = word.split('_')
@@ -148,7 +148,7 @@ module OmniAuth
             
           end # scope_query.each
         end # has_scope?
-
+        
       end # AccessToken
     end
   end

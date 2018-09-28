@@ -1,41 +1,17 @@
 require 'hashie'
 require 'omniauth'
+require 'omniauth-slack/refinements'
 require 'omniauth-slack/semaphore'
-
-module RefineArray
-  refine Array do
-    # Sort this array according to other-array's current order.
-    # See https://stackoverflow.com/questions/44536537/sort-the-array-with-reference-to-another-array
-    # This also handles items not in the reference_array.
-    # Pass :beginning or :ending as the 2nd arg to specify where to put unmatched source items.
-    # Pass a block to specify exactly which part of source value is being used for sort.
-    # Example: sources.sort_with(dependencies){|v| v.name.to_s}
-    def sort_with(reference_array, unmatched = :beginning)
-      ref_index = reference_array.to_a.each_with_index.to_h
-      unmatched_destination = case unmatched
-      when /begin/; -1
-      when /end/; 1
-      when Integer; unmatched
-      else -1
-      end
-      #puts "Sorting array #{self} with unmatched_destination '#{unmatched_destination}' and reference index #{ref_index}"
-      sort_by do |v|
-        val = block_given? ? yield(v) : v
-        [ref_index[val] || (unmatched_destination * reference_array.size), val]
-      end
-    end
-  end
-end
-
-using RefineArray
 
 module OmniAuth
   module Slack
+    using ArrayRefinements
   
     class Hashy < Hashie::Hash
       include Hashie::Extensions::MergeInitializer
       include Hashie::Extensions::MethodReader
       include Hashie::Extensions::MethodQuery
+      # Note that this extensions will introduce procs into the hash, which won't serialize.
       include Hashie::Extensions::IndifferentAccess
     end
     

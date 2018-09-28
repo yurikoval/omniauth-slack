@@ -1,9 +1,9 @@
-### Prepend this module to get simple mutexes for each/any method.
-
 module OmniAuth
   module Slack
-    module Semaphore
     
+    ### Prepend Semaphore module to get simple mutexes for each/any method.
+
+    module Semaphore    
       def initialize(*args)
         super
         @main_semaphore = Mutex.new
