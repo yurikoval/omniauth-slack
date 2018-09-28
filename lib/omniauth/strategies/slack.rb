@@ -322,8 +322,7 @@ module OmniAuth
       end
       
       # API call to get user permissions for workspace token.
-      # This is needed because workspace token 'sign-in-with-slack' is missing scopes
-      # in the :scope field (acknowledged issue in developer preview).
+      # This used to be needed, but its functionality is now in AcessToken.
       #
       # Returns [<id>: <resource>]
       #      
@@ -344,26 +343,10 @@ module OmniAuth
       end
       
       def scopes_requested
-        #(env['omniauth.params'] && env['omniauth.params']['scope']) || options.scope
-        
-        # (env['omniauth.authorize_params'].to_h['scope']) ||
-        # #(env['omniauth.params'] && env['omniauth.params']['scope']) ||
-        # options.scope
-
+        # omniauth.authorize_params is a custom enhancement to omniauth for omniauth-slack.
         env['omniauth.authorize_params'].to_h['scope']
       end
-      
-      #   # Scopes come from at least 3 different places now.
-      #   # * The classic :scope field (string)
-      #   # * New workshop token :scopes field (hash)
-      #   # * Call to apps.permissions.users.list (array)
-      #   #
-      #   # This returns hash of workspace scopes, with classic & new identity scopes in :identity.
-      #   # Lists of scopes are in array form.
-      #   def all_scopes(*args)
-      #     access_token.all_scopes(*args)
-      #   end
-      
+
       # Determine if given scopes exist in current authorization.
       # scopes_hash is hash where:
       #   key == scope type <identity|app_home|team|channel|group|mpim|im>

@@ -136,7 +136,7 @@ module OmniAuth
               test_scopes = case
                 when scopes.is_a?(String); scopes.split(/[, ]+/)
                 when scopes.is_a?(Array); scopes
-                else raise "Scope data must be a string or array or strings, like this {team: 'chat:write,team:read', channels: ['channels:read', 'chat:write']}"
+                else raise "Scope data must be a string or array of strings, like this {team: 'chat:write,team:read', channels: ['channels:read', 'chat:write']}"
               end
               #puts "TESTING with base_scopes: #{base_scopes.to_yaml}"
               
