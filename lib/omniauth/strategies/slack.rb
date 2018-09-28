@@ -8,6 +8,12 @@ require 'uri'
 using OmniAuth::Slack::Refinements
 
 module OmniAuth
+  class AuthHash
+    include Hashie::Extensions::DeepFind
+  end
+end
+
+module OmniAuth
   module Strategies
     
     class Slack < OmniAuth::Strategies::OAuth2
@@ -247,26 +253,26 @@ module OmniAuth
       
       data_method :image do
         source(:access_token) { self['team'].to_h['image_34'] }
-        source(:user_identity) { to_h['image_34'] }
+        source(:user_identity) { self['image_34'] }
         source(:api_users_info) { self['user'].to_h['profile'].to_h['image_34'] }
         source(:api_users_profile) { self['profile'].to_h['image_34'] }
       end
       
       data_method :team_name do
         source(:access_token) { team_name }
-        source(:team_identity) { to_h['name'] }
+        source(:team_identity) { self['name'] }
         source(:api_team_info) { self['team'].to_h['name'] }
       end
       
       data_method :team_domain do
         source(:access_token) { self['team'].to_h['domain'] }
-        source(:team_identity) { to_h['domain'] }
+        source(:team_identity) { self['domain'] }
         source(:api_team_info) { self['team'].to_h['domain'] }
       end
       
       data_method :team_image do
         source(:access_token) { self['team'].to_h['image_34'] }
-        source(:team_identity) { to_h['image_34'] }
+        source(:team_identity) { self['image_34'] }
         source(:api_team_info) { self['team'].to_h['icon'].to_h['image_34'] }
       end
             
@@ -275,9 +281,12 @@ module OmniAuth
       end
             
       data_method :nickname do
-        source(:api_users_info) { to_h['user'].to_h['name'] }
-        source(:access_token) { self['user'].to_h['name'] }
-        source(:user_identity) { to_h['name'] }
+        #source(:api_users_info) { self['user'].to_h['profile'].to_h['display_name'] }
+        source(:api_users_info) { deep_find 'display_name' }
+        #source(:api_users_info) { self['user'].to_h['name'] }
+        source(:api_users_info) { deep_find 'name' }
+        #source(:api_users_profile) { self['profile'].to_h['display_name'] }
+        source(:api_users_profile) { deep_find 'display_name' }
       end
 
       data_method :api_users_identity,
@@ -293,7 +302,7 @@ module OmniAuth
         default_value Hash.new
         scope classic: 'users:read', team: 'users:read'
         source :access_token do
-          get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
+          OmniAuth::AuthHash.new get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
         end
       end
 
@@ -301,7 +310,7 @@ module OmniAuth
         default_value Hash.new
         scope classic: 'users.profile:read', team: 'users.profile:read'
         source :access_token do
-          get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
+          OmniAuth::AuthHash.new get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).parsed
         end
       end      
 
