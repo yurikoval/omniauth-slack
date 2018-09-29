@@ -137,7 +137,7 @@ module OmniAuth
 
       module Extensions
       
-        # TODO: Temp for debugging
+        # NOTE: Temp for debugging
         def sort_with(a1, a2, unmatched=:beginning)
           prc = Proc.new if block_given?
           a1.sort_with(a2, unmatched, &prc)
@@ -221,6 +221,7 @@ module OmniAuth
         klass.logger.send(type, "(#{klass.name.split('::').last.downcase} data_method) #{text}") if klass.respond_to?(:logger)
       end
       
+      # Get/set scope queries.
       # Expects same args as AccessToken#has_scope?
       #   query == hash or array of hashes
       #   opts (options) == hash of options
@@ -235,32 +236,39 @@ module OmniAuth
         self[:scope].flatten!
       end
       
+      # Get/set scope_opts (:and | :or).
       def scope_opts(opts={})
         return self[__method__] unless opts && opts.any?
         #log :debug, "Declaring #{name}.scope_opts: #{opts}"
         self[:scope_opts] = opts
       end
       
+      # Get/set sources.
       def source(*args)
         return self[__method__] unless args.any?
         opts = args.last.is_a?(Hash) ? args.pop : Mashy.new
-        name = args.shift
-        code = args if args.any?
-        prc = block_given? ? Proc.new : nil
-        
+        name = args.shift if [String, Symbol].any?{|t| args[0].is_a?(t)}
+        code = case
+          when block_given?; Proc.new
+          when opts[:code]; opts.delete(:code)
+          when args[0].is_a?(Proc); args.shift
+          when args.any?; args
+          else nil
+        end          
         self[:source] ||= Hashie::Array.new
         #log :debug, "Declaring #{name}.source: #{name}, #{opts}, #{prc}"
         source_hash = Mashy.new({name: name, code: code}.merge(opts))
-        source_hash[:code] = Proc.new if block_given?
         self[:source] << source_hash
       end
       
+      # Get/set cache storage name (or disable with false).
       def storage(arg = nil)
         return self[__method__] unless arg
         #log :debug, "Declaring #{name}.cache_storage: #{arg}"
         self[:storage] = arg
       end
       
+      # Get/set conditions.
       def condition(code = nil)
         code = block_given? ? Proc.new : code
         return self[__method__] unless code
@@ -269,6 +277,7 @@ module OmniAuth
         self[:condition] << code
       end
       
+      # Get/set defaut_value.
       def default_value(arg = nil)
         return self[__method__] unless arg
         #log :debug, "Declaring #{name}.default_value: #{arg}"
@@ -305,6 +314,7 @@ module OmniAuth
         end   
       end
       
+      # Resolve all conditions and return true/false.
       def resolve_conditions(strategy, conditions = condition)
         #log :debug, "Resolve_conditions for data-method '#{name}' with conditions '#{conditions}'"
         return true unless conditions
@@ -324,11 +334,13 @@ module OmniAuth
         rslt
       end
       
+      # Resolve all scope queries and return true/false.
       def resolve_scopes(strategy)
         scopes = scope
         (scopes && scopes.any?) ? strategy.send(:has_scope?, scopes, scope_opts) : true
       end
       
+      # Resolve a single source-hash.
       def resolve_source(src, strategy)
         source_target = src.name
         source_code = src.code
@@ -352,6 +364,7 @@ module OmniAuth
         end
       end
       
+      # Select valid accessible source to attempt.
       def select_sources(strategy)
         source = self.source
         strategy.instance_eval do
@@ -363,6 +376,7 @@ module OmniAuth
         end
       end
       
+      # Wrap this around a block to cache result as ivar @<name-of-method>.
       def with_cache(strategy, &block)
         storage_name = storage || name
         ivar_data = strategy.instance_variable_get("@#{storage_name}")
@@ -371,7 +385,8 @@ module OmniAuth
         strategy.instance_variable_set("@#{storage_name}", result) if result && storage_name && storage != false
         result
       end
-            
+      
+      # Call the entire data-method.
       def call(strategy)
         with_cache(strategy) do
           result = nil

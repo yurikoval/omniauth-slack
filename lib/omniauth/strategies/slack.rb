@@ -14,16 +14,6 @@ module OmniAuth
     class Slack < OmniAuth::Strategies::OAuth2
       include OmniAuth::Slack::DataMethods
     
-      #   class AuthHash < OmniAuth::Slack::AuthHash
-      #   #class AuthHash < OmniAuth::AuthHash 
-      #     include Hashie::Extensions::DeepFind
-      #     # Custom AuthHash has a few enhancements.
-      #     def initialize(*args)
-      #       log :debug, "Loading Strategy::AuthHash < OmniAuth::Slack::AuthHash"
-      #       super
-      #     end
-      #   end
-      #
       class AuthHash < OmniAuth::Slack::AuthHash;
       end
     
@@ -95,8 +85,8 @@ module OmniAuth
           %w(deleted status color tz tz_label tz_offset is_admin is_owner is_primary_owner is_restricted is_ultra_restricted is_bot has_2fa).each do |key|
             hash[key.to_sym] = api_users_info['user'].to_h[key]
           end
-
         end
+        
         hash
       end # info
 
@@ -237,6 +227,12 @@ module OmniAuth
         #return {} unless access_token.key? 'incoming_webhook'
         access_token['incoming_webhook']
       end
+
+
+      # The data_method class method takes a name, hash, and/or block.
+      # The block is evaluated in the context of the new DataMethod instance.
+      # Use the DSL methods within the block to contruct the DataMethod instance.
+      # See data_methods.rb for available DSL methods.
 
       data_method :identity,
         storage: :identity,
