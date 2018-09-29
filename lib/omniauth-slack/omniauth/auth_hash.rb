@@ -1,4 +1,5 @@
-require 'omniauth'
+require 'hashie'
+require 'omniauth/auth_hash'
 
 module OmniAuth
   module Slack

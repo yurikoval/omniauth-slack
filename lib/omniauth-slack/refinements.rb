@@ -1,6 +1,7 @@
 require 'hashie'
 require 'omniauth/strategies/oauth2'
 require 'omniauth/auth_hash'
+require 'omniauth-slack/omniauth/auth_hash'
 
 # require 'omniauth-slack/oauth2/client'
 

@@ -14,11 +14,17 @@ module OmniAuth
     class Slack < OmniAuth::Strategies::OAuth2
       include OmniAuth::Slack::DataMethods
     
-      class AuthHash < OmniAuth::Slack::AuthHash
-        # Custom AuthHash has a few enhancements.
-        def initialize(*args)
-          log :debug, "Loading Strategy::AuthHash < OmniAuth::Slack::AuthHash"
-        end
+      #   class AuthHash < OmniAuth::Slack::AuthHash
+      #   #class AuthHash < OmniAuth::AuthHash 
+      #     include Hashie::Extensions::DeepFind
+      #     # Custom AuthHash has a few enhancements.
+      #     def initialize(*args)
+      #       log :debug, "Loading Strategy::AuthHash < OmniAuth::Slack::AuthHash"
+      #       super
+      #     end
+      #   end
+      #
+      class AuthHash < OmniAuth::Slack::AuthHash;
       end
     
       AUTH_OPTIONS = %w(redirect_uri scope team team_domain )
@@ -27,8 +33,6 @@ module OmniAuth
       option :authorize_options, AUTH_OPTIONS - %w(team_domain)
       option :pass_through_params, []
       option :preload_data_with_threads, 0
-      # option :include_data, []
-      # option :exclude_data, []
       option :additional_data, {}
       option :dependency_filter, /^api_/
 
@@ -69,11 +73,11 @@ module OmniAuth
           user_id: user_id,
           team_id: team_id,
           team_name: team_name,
-          image: image,
           team_domain: team_domain,
           team_image: team_image,
           team_email_domain: team_email_domain,
-          nickname: nickname
+          nickname: nickname,
+          image: image
         )
 
         # Disabled to manually define info.
@@ -119,7 +123,7 @@ module OmniAuth
       def authorize_params
         super.tap do |prms|
           digest = prms.hash
-          log(:debug, "Using authorize_params #{prms}")
+          #log(:debug, "Using authorize_params #{prms}")
           prms.merge!(request.params.keep_if{|k,v| pass_through_params.reject{|o| o.to_s == 'team_domain'}.include?(k.to_s)})
           log(:debug, "Modified authorize_params #{prms}") if prms.hash != digest
           session['omniauth.authorize_params'] = prms
@@ -177,6 +181,8 @@ module OmniAuth
       
       def auth_hash
         define_additional_data #unless skip_info?
+        # TODO: Find better way to ensure the auth_hash is the custom one.
+        #OmniAuth::Strategies::Slack::AuthHash.new(super)
         super
       end
       
@@ -309,7 +315,7 @@ module OmniAuth
         ]
 
       data_method :api_users_info do
-        default_value Hash.new
+        default_value AuthHash.new
         scope classic: 'users:read', team: 'users:read'
         source :access_token do
           get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).to_auth_hash
@@ -317,7 +323,7 @@ module OmniAuth
       end
 
       data_method :api_users_profile do
-        default_value Hash.new
+        default_value AuthHash.new
         scope classic: 'users.profile:read', team: 'users.profile:read'
         source :access_token do
           get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).to_auth_hash
