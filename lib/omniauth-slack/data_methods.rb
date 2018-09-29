@@ -262,9 +262,9 @@ module OmniAuth
       end
       
       def condition(code = nil)
+        code = block_given? ? Proc.new : code
         return self[__method__] unless code
         self[:condition] ||= []
-        code = block_given? ? Proc.new : code
         #log :debug, "Declaring #{name}.condition: #{code}"
         self[:condition] << code
       end
@@ -305,8 +305,7 @@ module OmniAuth
         end   
       end
       
-      def resolve_conditions(strategy)
-        conditions = condition
+      def resolve_conditions(strategy, conditions = condition)
         log :debug, "Resolve_conditions for data-method '#{name}' with conditions '#{conditions}'"
         return true unless conditions
         rslt = case conditions
@@ -369,10 +368,9 @@ module OmniAuth
             
       def call(strategy)
         with_cache(strategy) do
+          result = nil
           resolve_scopes(strategy) &&
           resolve_conditions(strategy) &&
-          
-          result = nil
           select_sources(strategy).each do |src|
             result = resolve_source(src, strategy)
             break if result
