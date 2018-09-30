@@ -1,11 +1,11 @@
 require 'uri'
+require 'omniauth-slack/refinements'
 require 'omniauth-slack/oauth2/client'
 require 'omniauth-slack/oauth2/access_token'
-require 'omniauth-slack/refinements'
 
 module OmniAuth
   module Slack
-  
+
     # Build an access token from access-token-hash or from token-string.
     def self.build_access_token(client_id, client_key, token_string_or_hash)
       client = OmniAuth::Slack::OAuth2::Client.new(

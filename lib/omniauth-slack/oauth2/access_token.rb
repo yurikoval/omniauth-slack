@@ -1,8 +1,11 @@
 require 'oauth2/access_token'
+require 'omniauth-slack/refinements'
 require 'omniauth-slack/semaphore'
 
 module OmniAuth
   module Slack
+    using StringRefinements
+    
     module OAuth2
       class AccessToken < ::OAuth2::AccessToken
         prepend Slack::Semaphore
@@ -45,7 +48,7 @@ module OmniAuth
       
         # Parsed identity scopes (workspace apps only).
         def apps_permissions_users_list(_user_id=nil)
-          #raise StandardError, "APUL caller #{caller[0][/`([^']*)'/, 1]} user #{_user_id}"
+          #raise StandardError, "APUL caller #{caller_method_name} user #{_user_id}"
           return {} unless is_app_token?
           semaphore.synchronize {
             @apps_permissions_users_list ||= (
@@ -74,7 +77,7 @@ module OmniAuth
             @all_scopes = (
               scopes = case
                 when params['scope']
-                  {'classic' => params['scope'].split(/[, ]+/)}
+                  {'classic' => params['scope'].words}
                 when params['scopes']
                   params['scopes']
                 when is_app_token?
@@ -134,7 +137,7 @@ module OmniAuth
   
             query.send(logic[:inner]) do |section, scopes|
               test_scopes = case
-                when scopes.is_a?(String); scopes.split(/[, ]+/)
+                when scopes.is_a?(String); scopes.words
                 when scopes.is_a?(Array); scopes
                 else raise "Scope data must be a string or array of strings, like this {team: 'chat:write,team:read', channels: ['channels:read', 'chat:write']}"
               end

@@ -6,6 +6,7 @@ require 'omniauth-slack/semaphore'
 module OmniAuth
   module Slack
     using ArrayRefinements
+    using StringRefinements
   
     class Hashy < Hashie::Hash
       include Hashie::Extensions::MergeInitializer
@@ -65,8 +66,8 @@ module OmniAuth
           @logger = OmniAuth.logger
           @data_methods ||= Hashy.new
           if self.is_a? OmniAuth::Strategy
-            option :dependencies, nil  # <string,or,array,of,strings>
-            option :dependency_filter  #, /.*/  # will be this /^api_/ when all data-methods & dependencies are properly declared.
+            option :dependencies #, nil  # string or array of strings.
+            option :dependency_filter  # regexp describing all data-methods that should be managed/gated.
           end
         end
       end
@@ -113,7 +114,8 @@ module OmniAuth
         @preloaded_data = 1
         #preload_methods = method_names || dependencies + options.additional_data.to_h.keys
         preload_methods = case method_names
-          when String; method_names.split(/[, ]+/)
+          #when String; method_names.split(SIMPLE_WORD_SPLIT_REGEXP)
+          when String; method_names.words
           when Array; method_names
           else []
         end
@@ -152,7 +154,7 @@ module OmniAuth
         # Strategy class dependencies.
         # Flattens compiled dependency_tree into an array of uniq strings.
         # TODO: I think this can be cleaned up.
-        def dependencies(filter = nil)  #default_options.dependency_filter)
+        def dependencies(filter = nil)
           filter ||= /.*/
           dtree = dependency_tree
           deps  = dtree.values.inject([]){|ary,hsh| ary.concat hsh.keys}
@@ -292,7 +294,6 @@ module OmniAuth
         return [] unless source
         source.inject([]) do |ary,src|
           src_name = src[:name].to_s
-          #src_name[/^api_/] && ary << src_name
           ary << src_name
           sub_method = klass.data_methods[src_name]
           sub_method ? ary | sub_method.dependency_array : ary 
@@ -307,7 +308,6 @@ module OmniAuth
         source.inject({}) do |hsh,src|
           ary = []
           src_name = src[:name].to_s
-          #src_name[/^api_/] && ary << src_name
           sub_method = klass.data_methods[src_name]
           hsh[src_name] = sub_method ? ary | sub_method.dependency_array : ary
           hsh
