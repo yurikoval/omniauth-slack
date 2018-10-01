@@ -300,7 +300,7 @@ module OmniAuth
       # or try this: y Strategy.data_methods.inject({}){|h,a| k,v = a[0], a[1]; h[k] = v.api_dependencies_hash(Strategy); h}
       def dependency_hash
         return {} unless source
-        source.inject({}) do |hsh,src|
+        [source].flatten(1).inject({}) do |hsh,src|
           ary = []
           src_name = src[:name].to_s
           sub_method = klass.data_methods[src_name]
@@ -340,7 +340,18 @@ module OmniAuth
         source_target = src.name
         source_code = src.code
         #log :debug, "Data method '#{name}' calling source_target '#{source_target}' with code '#{source_code}'."
-        target_result = source_target.is_a?(String) ? strategy.send(:eval, source_target) : strategy.send(source_target)
+        target_result = case source_target
+          when NilClass
+            strategy
+          when String
+            strategy.send(:eval, source_target)
+          when Symbol
+            strategy.send(source_target)
+          when Proc
+            strategy.instance_eval(&source_target)
+          else
+            source_target
+          end
         #log :debug, "Data method '#{name}' with source_target '#{source_target}': #{target_result.class}"
         
         if target_result
