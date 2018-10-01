@@ -179,16 +179,29 @@ module OmniAuth
       
       private
       
+      #   # Define methods for addional data from :additional_data option
+      #   def define_additional_data
+      #     return if @additional_data_defined
+      #     hash = options.additional_data
+      #     if !hash.to_h.empty?
+      #       hash.each do |k,v|
+      #         define_singleton_method(k) do
+      #           instance_variable_get(:"@#{k}") || 
+      #           instance_variable_set(:"@#{k}", v.respond_to?(:call) ? v.call(env) : v)
+      #         end
+      #       end
+      #       @additional_data_defined = 1
+      #     end
+      #   end
+      
       # Define methods for addional data from :additional_data option
       def define_additional_data
         return if @additional_data_defined
         hash = options.additional_data
         if !hash.to_h.empty?
           hash.each do |k,v|
-            define_singleton_method(k) do
-              instance_variable_get(:"@#{k}") || 
-              instance_variable_set(:"@#{k}", v.respond_to?(:call) ? v.call(env) : v)
-            end
+            OmniAuth::Slack::OAuth2::AccessToken.data_method(k, v)
+            self.class.data_method(k, v)
           end
           @additional_data_defined = 1
         end

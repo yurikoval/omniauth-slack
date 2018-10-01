@@ -372,7 +372,7 @@ module OmniAuth
       
       # Select valid accessible source to attempt.
       def select_sources(strategy)
-        source = self.source
+        source = [self.source].flatten(1).compact
         strategy.instance_eval do
           strategy_dependencies = dependencies
           master_dependencies_filtered = dependencies(dependency_filter)
