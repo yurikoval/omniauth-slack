@@ -107,6 +107,18 @@ module OmniAuth
         }
       end
       
+
+      def self.define_additional_data(definitions)
+        return if @additional_data_defined
+        if !definitions.to_h.empty?
+          definitions.each do |k,v|
+            data_method(k, v)
+            OmniAuth::Slack::OAuth2::AccessToken.data_method(k, v)
+          end
+          @additional_data_defined = 1
+        end
+      end
+
       
       # Pass on certain authorize_params to the Slack authorization GET request.
       # See https://github.com/omniauth/omniauth/issues/390
@@ -134,8 +146,13 @@ module OmniAuth
       end
       
       def callback_phase(*args)
-        # This technique copied from OmniAuth::Strategy
+        # This technique copied from OmniAuth::Strategy (this is how they do it for the other omniauth objects).
         env['omniauth.authorize_params'] = session.delete('omniauth.authorize_params')
+        
+        # This is trying to help move additiona_data definition away from user-action.
+        #define_additional_data
+        self.class.define_additional_data(env['omniauth.strategy'].options.additional_data)
+        
         super
       end
       
@@ -169,12 +186,13 @@ module OmniAuth
         full_host + script_name + callback_path
       end
       
-      def auth_hash
-        define_additional_data #unless skip_info?
-        # TODO: Find better way to ensure the auth_hash is the custom one.
-        #OmniAuth::Strategies::Slack::AuthHash.new(super)
-        super
-      end
+      # TODO: Remove, no longer needed.      
+      # def auth_hash
+      #   define_additional_data #unless skip_info?
+      #   # TODO: Find better way to ensure the auth_hash is the custom one.
+      #   #OmniAuth::Strategies::Slack::AuthHash.new(super)
+      #   super
+      # end
       
       
       private
@@ -194,14 +212,17 @@ module OmniAuth
       #     end
       #   end
       
-      # Define methods for addional data from :additional_data option
+      # Define methods for addional data from :additional_data option.
+      # This has been modified to use DataMethods.
+      # TODO: Create a class method, and pass it options.additional_data,
+      # then have that method do all the work at the class level.
       def define_additional_data
         return if @additional_data_defined
         hash = options.additional_data
         if !hash.to_h.empty?
           hash.each do |k,v|
-            OmniAuth::Slack::OAuth2::AccessToken.data_method(k, v)
             self.class.data_method(k, v)
+            OmniAuth::Slack::OAuth2::AccessToken.data_method(k, v)
           end
           @additional_data_defined = 1
         end
