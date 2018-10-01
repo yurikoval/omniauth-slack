@@ -108,7 +108,7 @@ module OmniAuth
       end
       
 
-      def self.define_additional_data(definitions)
+      def self.define_additional_data(definitions={})
         return if @additional_data_defined
         if !definitions.to_h.empty?
           definitions.each do |k,v|

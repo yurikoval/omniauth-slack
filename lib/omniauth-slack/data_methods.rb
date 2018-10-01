@@ -10,7 +10,8 @@ module OmniAuth
   
     class Hashy < Hashie::Hash
       include Hashie::Extensions::MergeInitializer
-      include Hashie::Extensions::MethodReader
+      #include Hashie::Extensions::MethodReader
+      include Hashie::Extensions::MethodAccess
       include Hashie::Extensions::MethodQuery
       # Note that this extensions will introduce procs into the hash, which won't serialize.
       include Hashie::Extensions::IndifferentAccess
@@ -192,20 +193,39 @@ module OmniAuth
 
     class DataMethod < Hashy
       
-      def self.new(*args)
+      #   def self.new(*args)
+      #     puts "DataMethod.new with args: #{args.to_yaml}"
+      #     opts = Mashy.new(args.last.is_a?(Hash) ? args.pop : {})
+      #     name = args[0].to_s
+      #     puts klass = args[1]
+      #     setup_block  = Proc.new if block_given?
+      #     new_object = allocate
+      #     %w(name scope scope_opts condition source storage default_value setup_block info_key).each do |property|
+      #       new_object[property] = nil
+      #     end
+      #     new_object[:name] = name if name
+      #     new_object[:klass] = klass
+      #     new_object[:setup_block] = setup_block if setup_block
+      #     new_object.merge!(opts)
+      #     new_object.send(:initialize, opts, &setup_block)
+      #     new_object
+      #   end
+      
+      def self.new(*args)  #(name, klass, optional-default-proc, optional-opts, &optional-block)
+        #puts "DataMethod.new with args: #{args.to_yaml}"
         opts = Mashy.new(args.last.is_a?(Hash) ? args.pop : {})
-        name = args[0].to_s
-        klass = args[1]
-        setup_block  = Proc.new if block_given?
         new_object = allocate
-        %w(name scope scope_opts condition source storage default_value setup_block info_key).each do |property|
+        %w(name scope scope_opts condition source storage default_value setup_block info_key klass).each do |property|
           new_object[property] = nil
         end
-        new_object[:name] = name if name
-        new_object[:klass] = klass
-        new_object[:setup_block] = setup_block if setup_block
+        
         new_object.merge!(opts)
-        new_object.send(:initialize, opts, &setup_block)
+        new_object.name = args.shift
+        new_object.klass = args.shift
+        new_object.default_value ||= args.shift if args[0].is_a?(Proc)
+        new_object.setup_block ||= Proc.new if block_given?
+
+        new_object.send(:initialize, opts, &new_object.setup_block)
         new_object
       end
       
