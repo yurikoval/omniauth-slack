@@ -65,10 +65,6 @@ module OmniAuth
           singleton_class.send :attr_reader, :data_methods, :logger
           @logger = OmniAuth.logger
           @data_methods ||= Hashy.new
-          if self.is_a? OmniAuth::Strategy
-            option :dependencies #, nil  # string or array of strings.
-            option :dependency_filter  # regexp describing all data-methods that should be managed/gated.
-          end
         end
       end
       
@@ -79,7 +75,7 @@ module OmniAuth
         raw = if !filter.nil?
           self.class.dependencies(filter).keys
         else
-          options.dependencies || @dependencies ||= self.class.dependencies(dependency_filter).keys
+          (options.dependencies if options.respond_to?(:dependencies)) || @dependencies ||= self.class.dependencies(dependency_filter).keys
         end
         
         case raw
@@ -90,7 +86,7 @@ module OmniAuth
       end
       
       def dependency_filter
-        options.dependency_filter
+        (options.dependency_filter if options.respond_to?(:dependency_filter)) || @dependency_filter
       end
       
       def data_methods; self.class.data_methods; end
@@ -139,7 +135,7 @@ module OmniAuth
 
       module Extensions
       
-        # NOTE: Temp for debugging
+        # NOTE: Temp for debugging Array#sort_with
         def sort_with(a1, a2, unmatched=:beginning)
           prc = Proc.new if block_given?
           a1.sort_with(a2, unmatched, &prc)
@@ -183,7 +179,7 @@ module OmniAuth
           define_method(name) do
             semaphore(name).synchronize { data_methods[__method__].call(self) }
           end
-          
+                    
           data_methods[name]
         end
         
@@ -195,7 +191,6 @@ module OmniAuth
     #####  DataMethod Class  #####
 
     class DataMethod < Hashy
-      #prepend Semaphore
       
       def self.new(*args)
         opts = Mashy.new(args.last.is_a?(Hash) ? args.pop : {})

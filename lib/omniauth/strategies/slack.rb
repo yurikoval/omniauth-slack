@@ -379,6 +379,10 @@ module OmniAuth
         access_token.has_scope?(scope_query, opts)
       end
       
+      # Experimental:
+      # Copies the api_ data-methods to AccessToken.
+      data_methods.each{|k,v| OmniAuth::Slack::OAuth2::AccessToken.data_method(k, v) if k.to_s[/^api_/]}
+      
     end # Slack
   end # Strategies
 end # OmniAuth

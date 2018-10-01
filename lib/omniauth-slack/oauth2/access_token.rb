@@ -1,14 +1,25 @@
 require 'oauth2/access_token'
 require 'omniauth-slack/refinements'
-require 'omniauth-slack/semaphore'
+
+# Experimental
+require 'omniauth-slack/data_methods'
 
 module OmniAuth
   module Slack
     using StringRefinements
     
     module OAuth2
-      class AccessToken < ::OAuth2::AccessToken
-        prepend Slack::Semaphore
+      class AccessToken < ::OAuth2::AccessToken        
+        # Experimental
+        include OmniAuth::Slack::DataMethods
+                
+        # This is automatic if DataMethods are included.
+        #require 'omniauth-slack/semaphore'
+        #prepend Slack::Semaphore
+        
+        # Experimental:
+        # Needed to copy Strategy data-methods to access-token without any modification.
+        def access_token; self; end
 
         %w(user_name user_email team_id team_name team_domain).each do |word|
           obj, atrb = word.split('_')
