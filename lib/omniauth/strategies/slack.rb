@@ -21,7 +21,7 @@ module OmniAuth
       
       option :name, 'slack'
       option :authorize_options, AUTH_OPTIONS - %w(team_domain)
-      option :pass_through_params, []
+      option :pass_through_params, ['team']
       option :preload_data_with_threads, 0
       option :additional_data, {}
       option :dependency_filter, /^api_/
@@ -148,7 +148,7 @@ module OmniAuth
       def callback_phase(*args)
         # This technique copied from OmniAuth::Strategy (this is how they do it for the other omniauth objects).
         env['omniauth.authorize_params'] = session.delete('omniauth.authorize_params')
-        
+                
         # This is trying to help move additiona_data definition away from user-action.
         #define_additional_data
         self.class.define_additional_data(env['omniauth.strategy'].options.additional_data)
@@ -196,37 +196,6 @@ module OmniAuth
       
       
       private
-      
-      #   # Define methods for addional data from :additional_data option
-      #   def define_additional_data
-      #     return if @additional_data_defined
-      #     hash = options.additional_data
-      #     if !hash.to_h.empty?
-      #       hash.each do |k,v|
-      #         define_singleton_method(k) do
-      #           instance_variable_get(:"@#{k}") || 
-      #           instance_variable_set(:"@#{k}", v.respond_to?(:call) ? v.call(env) : v)
-      #         end
-      #       end
-      #       @additional_data_defined = 1
-      #     end
-      #   end
-      
-      # Define methods for addional data from :additional_data option.
-      # This has been modified to use DataMethods.
-      # TODO: Create a class method, and pass it options.additional_data,
-      # then have that method do all the work at the class level.
-      def define_additional_data
-        return if @additional_data_defined
-        hash = options.additional_data
-        if !hash.to_h.empty?
-          hash.each do |k,v|
-            self.class.data_method(k, v)
-            OmniAuth::Slack::OAuth2::AccessToken.data_method(k, v)
-          end
-          @additional_data_defined = 1
-        end
-      end
       
       def get_additional_data
         if false && skip_info?
@@ -415,7 +384,7 @@ module OmniAuth
       
       # Experimental:
       # Copies the api_ data-methods to AccessToken.
-      data_methods.each{|k,v| OmniAuth::Slack::OAuth2::AccessToken.data_method(k, v) if k.to_s[/^api_/]}
+      data_methods.each{|k,v| OmniAuth::Slack::OAuth2::AccessToken.data_method(k, v) if k.to_s[default_options.dependency_filter]}
       
     end # Slack
   end # Strategies
