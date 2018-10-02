@@ -167,15 +167,16 @@ module OmniAuth
         end
         
         # Build a DataMethod object from a hash or a block.
-        def data_method(name, opts = Hashy.new)
+        #def data_method(name, opts = Hashy.new)
+        def data_method(*args) # (name, optional-default-val, optional-opts, &optional-block)
           #logger.debug "(slack) Building data_method object (#{name}, #{opts})"
           
-          data_methods[name] = case
-            when block_given?
-              DataMethod.new(name, self, opts, &Proc.new)  #opts.merge!(name: name)
-            else
-              DataMethod.new(name, self, opts)  #opts.merge!(name: name)
-          end
+          opts = args.last.is_a?(Hash) ? args.pop : Hashy.new
+          name = args.shift
+          default_val  = args.shift
+          blk = Proc.new if block_given?
+          
+          data_methods[name] = DataMethod.new(name, self, default_val, opts, &blk)
                     
           define_method(name) do
             semaphore(name).synchronize { data_methods[__method__].call(self) }
@@ -222,7 +223,7 @@ module OmniAuth
         new_object.merge!(opts)
         new_object.name = args.shift
         new_object.klass = args.shift
-        new_object.default_value ||= args.shift if args[0].is_a?(Proc)
+        new_object.default_value ||= args.shift #if args[0].is_a?(Proc)
         new_object.setup_block ||= Proc.new if block_given?
 
         new_object.send(:initialize, opts, &new_object.setup_block)
@@ -261,7 +262,7 @@ module OmniAuth
       end
       
       # Get/set sources.
-      def source(*args)
+      def source(*args) # (optional-name, optional-proc, optional-opts, &optional-block)
         return self[__method__] unless args.any?
         opts = args.last.is_a?(Hash) ? args.pop : Mashy.new
         name = args.shift if [String, Symbol].any?{|t| args[0].is_a?(t)}
@@ -300,8 +301,6 @@ module OmniAuth
         #log :debug, "Declaring #{name}.default_value: #{arg}"
         self[:default_value] = arg
       end
-
-
 
       # Dependencies for this DataMethod instance.
       # For example try this: Strategy.data_methods.each{|k,v| puts "#{k}: #{v.api_dependencies_array(Strategy).inspect}" };nil
@@ -371,22 +370,38 @@ module OmniAuth
             strategy.instance_eval(&source_target)
           else
             source_target
-          end
+        end
         #log :debug, "Data method '#{name}' with source_target '#{source_target}': #{target_result.class}"
         
         if target_result
-          result = case
-            when source_code.is_a?(Proc)
+          result = case source_code
+            when Proc
               target_result.instance_eval(&source_code)
-            when source_code.is_a?(String)
+            when String
               target_result.send(:eval, source_code)
-            when source_code.is_a?(Array)
+            when Array
               target_result.send(:eval, source_code.join('.'))
-            when source_code.nil?
+            when NilClass
               target_result
             else
               nil
           end
+        end
+      end
+        
+      def resolve_default_value(strategy)
+        dval = default_value
+        case dval
+        # Since dval could be string or symbol, the only time it should be processed is when it is a proc.
+        #
+        # when String
+        #   strategy.send(:eval, dval)
+        # when Symbol
+        #   strategy.send(dval)
+        when Proc
+          strategy.instance_eval(&dval)
+        else
+          dval
         end
       end
       
@@ -423,7 +438,7 @@ module OmniAuth
             break if result
           end
           
-          result ||= default_value
+          result ||= resolve_default_value strategy
           #log :debug, "Data method '#{name}' returning: #{result}"
           #result
         end
