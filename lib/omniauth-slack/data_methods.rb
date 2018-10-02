@@ -59,7 +59,7 @@ module OmniAuth
     module DataMethods
           
       def self.included(other)
-        OmniAuth.logger.debug "#{other} included #{self}"
+        #OmniAuth.logger.debug "#{other} included #{self}"
         other.instance_eval do
           prepend Semaphore
           extend Extensions
@@ -231,7 +231,7 @@ module OmniAuth
       end
       
       def initialize(opts = {})
-        log :debug, "Initialize #{self.name}."
+        #log :debug, "Initialize #{self.name}."
         instance_eval &Proc.new if block_given?
       end
       
