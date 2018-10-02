@@ -193,25 +193,7 @@ module OmniAuth
     #####  DataMethod Class  #####
 
     class DataMethod < Hashy
-      
-      #   def self.new(*args)
-      #     puts "DataMethod.new with args: #{args.to_yaml}"
-      #     opts = Mashy.new(args.last.is_a?(Hash) ? args.pop : {})
-      #     name = args[0].to_s
-      #     puts klass = args[1]
-      #     setup_block  = Proc.new if block_given?
-      #     new_object = allocate
-      #     %w(name scope scope_opts condition source storage default_value setup_block info_key).each do |property|
-      #       new_object[property] = nil
-      #     end
-      #     new_object[:name] = name if name
-      #     new_object[:klass] = klass
-      #     new_object[:setup_block] = setup_block if setup_block
-      #     new_object.merge!(opts)
-      #     new_object.send(:initialize, opts, &setup_block)
-      #     new_object
-      #   end
-      
+
       def self.new(*args)  #(name, klass, optional-default-proc, optional-opts, &optional-block)
         #puts "DataMethod.new with args: #{args.to_yaml}"
         opts = Mashy.new(args.last.is_a?(Hash) ? args.pop : {})
@@ -231,7 +213,7 @@ module OmniAuth
       end
       
       def initialize(opts = {})
-        #log :debug, "Initialize #{self.name}."
+        log :debug, "Initialize #{self.name}."
         instance_eval &Proc.new if block_given?
       end
       
