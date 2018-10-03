@@ -104,7 +104,7 @@ module OmniAuth
         end
       
         # Determine if given scopes exist in current authorization.
-        # This is classic and worspace token compatible (TODO: does this accept all slack token types?).
+        # This is classic and workspace token compatible (TODO: does this accept all slack token types?).
         # scope_query is a hash where:
         #   key == scope type <app_home|team|channel|group|mpim|im|identity|classic>
         #   val == array or string of individual scopes.
@@ -112,6 +112,7 @@ module OmniAuth
         #     user_id
         #     base_scopes
         #     logic
+        # If scope_query is a string, it will be interpreted as {classic: scope_query}
         #
         def has_scope?(scope_query, opts={})
           #puts "HasScope: #{scope_query} with opts: '#{opts}'"
@@ -121,6 +122,7 @@ module OmniAuth
           # end
           opts ||= {}         
           user = opts[:user_id] || user_id
+          scope_query = {classic: scope_query} if scope_query.is_a?(String)
           scope_query = [scope_query].flatten
           #puts "AccessToken#has_scope with user '#{user}' scope_query '#{scope_query}' opts '#{opts}'"
           

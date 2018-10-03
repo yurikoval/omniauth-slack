@@ -158,6 +158,7 @@ module OmniAuth
           # TODO: Do we still need this meths list?
           meths = dtree.keys.select(){|k| k.to_s[filter]}
           both = (deps.uniq | meths).sort_with(dtree.keys)
+          both.delete('default')
           both.inject({}){|h, v| h[v] = deps.count(v.to_s); h}.select{|k,v| k[filter]}
         end  
         
@@ -245,7 +246,8 @@ module OmniAuth
       
       # Get/set sources.
       def source(*args) # (optional-name, optional-proc, optional-opts, &optional-block)
-        return self[__method__] unless args.any?
+        #return self[__method__] unless args.any?
+        return source_array unless args.any?
         opts = args.last.is_a?(Hash) ? args.pop : Mashy.new
         name = args.shift if [String, Symbol].any?{|t| args[0].is_a?(t)}
         code = case
@@ -259,6 +261,17 @@ module OmniAuth
         #log :debug, "Declaring #{name}.source: #{name}, #{opts}, #{prc}"
         source_hash = Mashy.new({name: name, code: code}.merge(opts))
         self[:source] << source_hash
+      end
+      
+      def source_array
+        Hashie::Array.new.concat( [self[:source]].flatten(1).compact.map do |v|
+          case v
+          when Hash; Mashy.new(v)
+          when String; Mashy.new(name: 'default', code: proc{eval(v)})
+          when Proc; Mashy.new(name: 'default', code: v)
+          else Mashy.new(name: 'unknown', code: v)
+          end
+        end)
       end
       
       # Get/set cache storage name (or disable with false).
@@ -287,10 +300,10 @@ module OmniAuth
       # Dependencies for this DataMethod instance.
       # For example try this: Strategy.data_methods.each{|k,v| puts "#{k}: #{v.api_dependencies_array(Strategy).inspect}" };nil
       def dependency_array
-        return [] unless source
-        source.inject([]) do |ary,src|
-          src_name = src[:name].to_s
-          ary << src_name
+        return [] unless sources = source
+        sources.inject([]) do |ary,src|
+          src_name = src.is_a?(Hash) && src[:name].to_s #|| 'default'
+          ary << src_name if src_name
           sub_method = klass.data_methods[src_name]
           sub_method ? ary | sub_method.dependency_array : ary 
         end
@@ -300,11 +313,11 @@ module OmniAuth
       # For example try this: Strategy.data_methods.each{|k,v| puts "#{k}: #{v.api_dependencies_hash(Strategy).inspect}" };nil
       # or try this: y Strategy.data_methods.inject({}){|h,a| k,v = a[0], a[1]; h[k] = v.api_dependencies_hash(Strategy); h}
       def dependency_hash
-        return {} unless source
-        [source].flatten(1).inject({}) do |hsh,src|
+        return {} unless sources = source
+        sources.inject({}) do |hsh,src|
           ary = []
-          src_name = src[:name].to_s
-          sub_method = klass.data_methods[src_name]
+          src_name = src.is_a?(Hash) && src[:name].to_s #|| 'default'
+          sub_method = klass.data_methods[src_name] if src_name
           hsh[src_name] = sub_method ? ary | sub_method.dependency_array : ary
           hsh
         end   
@@ -333,15 +346,17 @@ module OmniAuth
       # Resolve all scope queries and return true/false.
       def resolve_scopes(strategy)
         scopes = scope
-        (scopes && scopes.any?) ? strategy.send(:has_scope?, scopes, scope_opts) : true
+        (scopes && scopes.size > 0) ? strategy.send(:has_scope?, scopes, scope_opts) : true
       end
       
       # Resolve a single source-hash.
       def resolve_source(src, strategy)
-        source_target = src.name
-        source_code = src.code
+        source_target = src.respond_to?(:name) ? src.name : strategy
+        source_code = src.respond_to?(:code) ? src.code : src
         #log :debug, "Data method '#{name}' calling source_target '#{source_target}' with code '#{source_code}'."
         target_result = case source_target
+          when 'default'
+            strategy
           when NilClass
             strategy
           when String
@@ -389,12 +404,14 @@ module OmniAuth
       
       # Select valid accessible source to attempt.
       def select_sources(strategy)
-        source = [self.source].flatten(1).compact
+        sources = source
         strategy.instance_eval do
           strategy_dependencies = dependencies
           master_dependencies_filtered = dependencies(dependency_filter)
-          source.select do |src|
-            strategy_dependencies.include?(src.name.to_s) || !master_dependencies_filtered.include?(src.name.to_s)
+          sources.select do |src|
+            strategy_dependencies.include?(src.name.to_s) ||
+            !master_dependencies_filtered.include?(src.name.to_s) ||
+            src.name == 'default'
           end.sort_with(strategy_dependencies){|v| v.name.to_s}
         end
       end
