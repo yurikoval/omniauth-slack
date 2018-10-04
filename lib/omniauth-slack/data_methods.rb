@@ -352,8 +352,12 @@ module OmniAuth
       # Resolve a single source-hash.
       def resolve_source(src, strategy)
         source_target = src.respond_to?(:name) ? src.name : strategy
-        source_code = src.respond_to?(:code) ? src.code : src
-        #log :debug, "Data method '#{name}' calling source_target '#{source_target}' with code '#{source_code}'."
+        source_code = case
+          when src.respond_to?(:code);src.code
+          when src.is_a?(Proc); src
+          else proc{self}
+        end
+        #log :debug, "'#{name}' calling source_target '#{source_target}' on klass_instance '#{strategy}' with code '#{source_code}'."
         target_result = case source_target
           when 'default'
             strategy

@@ -103,7 +103,7 @@ module OmniAuth
           user_profile: @api_users_profile,
           team_info: @api_team_info,
           additional_data: get_additional_data,
-          raw_info: @raw_info
+          raw_info: raw_info
         }
       end
       
