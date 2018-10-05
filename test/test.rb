@@ -172,16 +172,16 @@ class IdentityTest < StrategyTestCase
   end
 end
 
-class SkipInfoTest < StrategyTestCase
-
-  test 'info should not include extended info when skip_info is specified' do
-    @access_token = stub_everything("OmniAuth::Slack::OAuth2::AccessToken")
-    @options = { skip_info: true }
-    strategy.stubs(:access_token).returns(@access_token)
-    assert_equal %w(name email user_id team_name team_id image), strategy.info.keys.map(&:to_s)
-  end
-
-end
+# class SkipInfoTest < StrategyTestCase
+# 
+#   test 'info should not include extended info when skip_info is specified' do
+#     @access_token = stub_everything("OmniAuth::Slack::OAuth2::AccessToken")
+#     @options = { skip_info: true }
+#     strategy.stubs(:access_token).returns(@access_token)
+#     assert_equal %w(name email user_id team_name team_id image), strategy.info.keys.map(&:to_s)
+#   end
+# 
+# end
 
 class AuthorizeParamsTest < StrategyTestCase
 
@@ -213,61 +213,61 @@ class InitializeTest < StrategyTestCase
 
 end
 
-class SemaphoreTest < StrategyTestCase
+# class SemaphoreTest < StrategyTestCase
+# 
+#   def setup
+#     super
+#     
+#     def strategy.test_method
+#       send :semaphore
+#     end
+#   end
+# 
+#   test 'synchronized management of method-specific mutexes' do
+#     strategy.test_method
+#     assert_kind_of Mutex, strategy.instance_variable_get(:@semaphores)['test_method']
+#   end
+# 
+# end
 
-  def setup
-    super
-    
-    def strategy.test_method
-      send :semaphore
-    end
-  end
-
-  test 'synchronized management of method-specific mutexes' do
-    strategy.test_method
-    assert_kind_of Mutex, strategy.instance_variable_get(:@semaphores)['test_method']
-  end
-
-end
-
-class ActiveMethodsTest < StrategyTestCase
-
-  test 'with no settings, returns all defined api methods' do
-    assert_equal %w(apps_permissions_users_list identity user_info user_profile team_info bot_info),
-      strategy.send(:active_methods)
-  end
-  
-  test 'with :include_data, returns only included methods' do
-    strategy.options[:include_data] = %w(identity team_info)
-    assert_equal %w(identity team_info),
-      strategy.send(:active_methods)    
-  end
-
-  test 'with :exclude_data, returns all but excluded methods' do
-    strategy.options[:exclude_data] = %w(identity team_info)
-    assert_equal %w(apps_permissions_users_list user_info user_profile bot_info),
-      strategy.send(:active_methods)    
-  end
-
-end
-
-class IsNotExcluded < StrategyTestCase
-
-  def setup
-    super
-    
-    def identity
-      strategy.send 'is_not_excluded?'
-    end
-  end
-
-  test 'returns true if calling method is in active-methods' do
-    assert_equal true, identity
-  end
-  
-  test 'returns false if calling method is not in active-methods' do
-    strategy.options[:exclude_data] = 'identity'
-    assert_equal false, identity
-  end
-
-end
+# class ActiveMethodsTest < StrategyTestCase
+# 
+#   test 'with no settings, returns all defined api methods' do
+#     assert_equal %w(apps_permissions_users_list identity user_info user_profile team_info bot_info),
+#       strategy.send(:active_methods)
+#   end
+#   
+#   test 'with :include_data, returns only included methods' do
+#     strategy.options[:include_data] = %w(identity team_info)
+#     assert_equal %w(identity team_info),
+#       strategy.send(:active_methods)    
+#   end
+# 
+#   test 'with :exclude_data, returns all but excluded methods' do
+#     strategy.options[:exclude_data] = %w(identity team_info)
+#     assert_equal %w(apps_permissions_users_list user_info user_profile bot_info),
+#       strategy.send(:active_methods)    
+#   end
+# 
+# end
+# 
+# class IsNotExcluded < StrategyTestCase
+# 
+#   def setup
+#     super
+#     
+#     def identity
+#       strategy.send 'is_not_excluded?'
+#     end
+#   end
+# 
+#   test 'returns true if calling method is in active-methods' do
+#     assert_equal true, identity
+#   end
+#   
+#   test 'returns false if calling method is not in active-methods' do
+#     strategy.options[:exclude_data] = 'identity'
+#     assert_equal false, identity
+#   end
+# 
+# end
