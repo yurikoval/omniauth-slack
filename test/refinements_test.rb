@@ -1,6 +1,7 @@
 require 'helper'
 require 'omniauth-slack'
 
+
 class TestObjectRefinements
   using OmniAuth::Slack::ObjectRefinements
 
@@ -18,6 +19,8 @@ class TestObjectRefinements
 end
 
 describe OmniAuth::Slack::ObjectRefinements do
+  using OmniAuth::Slack::ObjectRefinements
+  
   describe 'caller_method_name' do
     instance = TestObjectRefinements.new
     it "gets the name of the method that called the current method" do

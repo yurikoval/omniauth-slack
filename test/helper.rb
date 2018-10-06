@@ -5,6 +5,7 @@ require "omniauth/strategies/slack"
 
 OmniAuth.config.test_mode = true
 OmniAuth.logger.level = 1
+ENV['OMNIAUTH_SLACK_DEBUG']='false'
 
 module BlockTestHelper
   def test(name, &blk)

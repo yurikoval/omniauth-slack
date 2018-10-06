@@ -124,10 +124,10 @@ module OmniAuth
       # See https://github.com/omniauth/omniauth/issues/390
       def authorize_params
         super.tap do |prms|
-          digest = prms.hash
-          #log(:debug, "Using authorize_params #{prms}")
+          params_digest = prms.hash
+          debug{"Using authorize_params #{prms}"}
           prms.merge!(request.params.keep_if{|k,v| pass_through_params.reject{|o| o.to_s == 'team_domain'}.include?(k.to_s)})
-          log(:debug, "Modified authorize_params #{prms}") if prms.hash != digest
+          log(:debug, "Modified authorize_params #{prms}") if prms.hash != params_digest
           session['omniauth.authorize_params'] = prms
         end
       end
@@ -176,7 +176,7 @@ module OmniAuth
         # Put the raw_info in a place where the Client will update it for each API request.
         new_client.history = raw_info
         
-        #log(:debug, "Strategy #{self} using Client #{new_client}")
+        debug{"Strategy #{self} using Client #{new_client}"}
         
         new_client
       end

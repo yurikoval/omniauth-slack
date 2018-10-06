@@ -1,8 +1,7 @@
 require 'oauth2/access_token'
 require 'omniauth-slack/refinements'
-
-# Experimental
 require 'omniauth-slack/data_methods'
+require 'omniauth-slack/debug'
 
 module OmniAuth
   module Slack
@@ -10,8 +9,8 @@ module OmniAuth
     
     module OAuth2
       class AccessToken < ::OAuth2::AccessToken        
-        # Experimental
         include OmniAuth::Slack::DataMethods
+        include OmniAuth::Slack::Debug
                 
         # This is automatic if DataMethods are included.
         #require 'omniauth-slack/semaphore'
@@ -117,8 +116,9 @@ module OmniAuth
         # If scope_query is a string, it will be interpreted as {classic: scope_query}
         #
         def has_scope?(scope_query, opts={})
-          #puts "HasScope: #{scope_query} with opts: '#{opts}'"
+          debug{"HasScope: #{scope_query} with opts: '#{opts}'"}
           # Experimental: accept array of scope-query arrays.
+          # I don't think we want to do this.
           # if scope_query.is_a?(Array) && scope_query[0].is_a?(Array)
           #   puts "Processing list of scope queries"
           #   return scope_query.all?{|query| puts "Processing scope query: #{query}"; has_scope?(*query)}
@@ -126,20 +126,20 @@ module OmniAuth
           opts ||= {}         
           user = opts[:user_id] || user_id
           scope_query = [scope_query].flatten
-          #puts "AccessToken#has_scope with user '#{user}' scope_query '#{scope_query}' opts '#{opts}'"
+          debug{"AccessToken#has_scope with user '#{user}' scope_query '#{scope_query}' opts '#{opts}'"}
           
           logic = opts[:logic] || 'or'
           
           scope_base = case
             when opts[:base_scopes]
-              #puts "Base Scopes: opts[:base_scopes]"
+              debug{"Base Scopes: opts[:base_scopes]"}
               opts[:base_scopes]
             #when user && query.is_a?(Hash) && query.keys.detect{|k| k.to_s == 'identity'}
             when user && scope_query.detect{ |q| q.is_a?(Hash) && q.keys.detect{|k| k.to_s == 'identity'} }
-              #puts "Base Scopes: all_scopes(user)"
+              debug{"Base scopes using: all_scopes(user)"}
               all_scopes(user)
             else
-              #puts "Base Scopes: all_scopes"
+              debug{"Base scopes using: all_scopes"}
               all_scopes
           end
           
@@ -159,7 +159,7 @@ module OmniAuth
         # TODO: Can this be added to OAuth2::AccessToken as a generic has_scope? Would it work for other providers?
         #
         def self.has_scope?(scope_query:{}, scope_base:{}, logic:'or')
-          #puts "AccessToken.has_scope? scope_query '#{scope_query}' scope_base '#{scope_base}' logic '#{logic}'"
+          debug{"AccessToken.has_scope? scope_query '#{scope_query}' scope_base '#{scope_base}' logic '#{logic}'"}
           _scope_query = scope_query.is_a?(String) ? {classic: scope_query} : scope_query
           _scope_query = [_scope_query].flatten
           _scope_base  = scope_base
@@ -169,10 +169,10 @@ module OmniAuth
             when logic.to_s.downcase == 'and'; {outter: 'any?', inner: 'all?'}
             else {outter: 'all?', inner: 'any?'}
           end
-          #puts "Scope Logic #{logic.inspect}"
+          debug{"Scope Logic #{_logic.inspect}"}
           
           _scope_query.send(_logic[:outter]) do |query|
-            #puts "Outter Scope Query: #{query.inspect}"
+            debug{"Outter Scope Query: #{_scope_query.inspect}"}
 
             query.send(_logic[:inner]) do |section, scopes|
               test_scopes = case
@@ -182,7 +182,7 @@ module OmniAuth
               end
               
               test_scopes.send(_logic[:inner]) do |scope|
-                #puts "Inner Scope Query section: #{section.to_s}, scope: #{scope}"
+                debug{"Inner Scope Query section: #{section.to_s}, scope: #{scope}"}
                 _scope_base.to_h[section.to_s].to_a.include?(scope.to_s)
               end
             end

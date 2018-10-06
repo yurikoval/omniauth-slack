@@ -2,11 +2,13 @@ require 'hashie'
 require 'omniauth'
 require 'omniauth-slack/refinements'
 require 'omniauth-slack/semaphore'
+require 'omniauth-slack/debug'
 
 module OmniAuth
   module Slack
     using ArrayRefinements
     using StringRefinements
+    using ObjectRefinements
   
     class Hashy < Hashie::Hash
       include Hashie::Extensions::MergeInitializer
@@ -15,6 +17,10 @@ module OmniAuth
       include Hashie::Extensions::MethodQuery
       # Note that this extensions will introduce procs into the hash, which won't serialize.
       include Hashie::Extensions::IndifferentAccess
+      
+      def self.inherited(other)
+        other.send :include, OmniAuth::Slack::Debug
+      end
     end
     
     class Mashy < Hashie::Mash
@@ -57,12 +63,15 @@ module OmniAuth
     # end
 
     module DataMethods
+      include OmniAuth::Slack::Debug
           
       def self.included(other)
         #OmniAuth.logger.debug "#{other} included #{self}"
+        debug{"#{other} included #{self}"}
         other.instance_eval do
           prepend Semaphore
           extend Extensions
+          include OmniAuth::Slack::Debug
           singleton_class.send :attr_reader, :data_methods, :logger
           @logger = OmniAuth.logger
           @data_methods ||= Hashy.new
@@ -98,6 +107,7 @@ module OmniAuth
         data_methods.each do |name, opts|
           key = opts[:info_key]
           #log(:debug, "Applying key '#{key}' with method '#{name}'")
+          debug{"Applying key '#{key}' with method '#{name}'"}
           next unless key
           rslt[key] ||= send(name)
           #log(:debug, "Applying key '#{key}' with method '#{name}': #{rslt[key]}")
@@ -135,12 +145,6 @@ module OmniAuth
       
 
       module Extensions
-      
-        # NOTE: Temp for debugging Array#sort_with
-        def sort_with(a1, a2, unmatched=:beginning)
-          prc = Proc.new if block_given?
-          a1.sort_with(a2, unmatched, &prc)
-        end
 
         # List DataMethod instances and their dependencies.
         def dependency_tree
@@ -176,6 +180,7 @@ module OmniAuth
           name = args.shift
           default_val  = args.shift
           blk = Proc.new if block_given?
+          debug{"Building data_method object (#{name}, #{opts})"}
           
           data_methods[name] = DataMethod.new(name, self, default_val, opts, &blk)
                     
@@ -196,7 +201,7 @@ module OmniAuth
     class DataMethod < Hashy
 
       def self.new(*args)  #(name, klass, optional-default-proc, optional-opts, &optional-block)
-        #puts "DataMethod.new with args: #{args.to_yaml}"
+        debug{"DataMethod.new with args: #{args}"}
         opts = Mashy.new(args.last.is_a?(Hash) ? args.pop : {})
         new_object = allocate
         %w(name scope scope_opts condition source storage default_value setup_block info_key klass).each do |property|
@@ -214,8 +219,16 @@ module OmniAuth
       end
       
       def initialize(opts = {})
-        log :debug, "Initialize #{self.name}."
-        instance_eval &Proc.new if block_given?
+        debug('data_method'){"initializing #{self.name}."}
+        instance_eval(&Proc.new) if block_given?
+      end
+      
+      # Override instance debug to insert local :klass as Class,
+      # instead of default, which would be DataMethod.
+      def debug(method_name=nil, _klass=klass, &block)
+        #puts caller_method_name
+        method_name ||= caller_method_name
+        super(method_name, _klass, &block)
       end
       
       def log(type, text)
@@ -230,6 +243,7 @@ module OmniAuth
         return self[__method__] unless args.any?
         self[:scope] ||= []
         #log :debug, "Declaring #{name}.scope: #{args}"
+        debug{"Declaring #{name}.scope: #{args}"}
         query = args.shift
         opts = args.last
         self[:scope_opts] = opts if opts
@@ -241,6 +255,7 @@ module OmniAuth
       def scope_opts(opts={})
         return self[__method__] unless opts && opts.any?
         #log :debug, "Declaring #{name}.scope_opts: #{opts}"
+        debug{"Declaring #{name}.scope_opts: #{opts}"}
         self[:scope_opts] = opts
       end
       
@@ -249,7 +264,7 @@ module OmniAuth
         #return self[__method__] unless args.any?
         return source_array unless args.any?
         opts = args.last.is_a?(Hash) ? args.pop : Mashy.new
-        name = args.shift if [String, Symbol].any?{|t| args[0].is_a?(t)}
+        source_name = args.shift if [String, Symbol].any?{|t| args[0].is_a?(t)}
         code = case
           when block_given?; Proc.new
           when opts[:code]; opts.delete(:code)
@@ -258,8 +273,9 @@ module OmniAuth
           else nil
         end          
         self[:source] ||= Hashie::Array.new
-        #log :debug, "Declaring #{name}.source: #{name}, #{opts}, #{prc}"
-        source_hash = Mashy.new({name: name, code: code}.merge(opts))
+        #log :debug, "Declaring #{source_name}.source: #{name}, #{opts}, #{prc}"
+        debug{"Declaring source :#{source_name} for #{name}: #{opts}, #{code}"}
+        source_hash = Mashy.new({name: source_name, code: code}.merge(opts))
         self[:source] << source_hash
       end
       
@@ -278,6 +294,7 @@ module OmniAuth
       def storage(arg = nil)
         return self[__method__] unless arg
         #log :debug, "Declaring #{name}.cache_storage: #{arg}"
+        debug{"Declaring #{name}.cache_storage: #{arg}"}
         self[:storage] = arg
       end
       
@@ -287,6 +304,7 @@ module OmniAuth
         return self[__method__] unless code
         self[:condition] ||= []
         #log :debug, "Declaring #{name}.condition: #{code}"
+        debug{"Declaring #{name}.condition: #{code}"}
         self[:condition] << code
       end
       
@@ -294,6 +312,7 @@ module OmniAuth
       def default_value(arg = nil)
         return self[__method__] unless arg
         #log :debug, "Declaring #{name}.default_value: #{arg}"
+        debug{"Declaring #{name}.default_value: #{arg}"}
         self[:default_value] = arg
       end
 
@@ -326,9 +345,10 @@ module OmniAuth
       # Resolve all conditions and return true/false.
       def resolve_conditions(strategy, conditions = condition)
         #log :debug, "Resolve_conditions for data-method '#{name}' with conditions '#{conditions}'"
+        debug{"Resolve_conditions for data-method '#{name}' with conditions '#{conditions}'"}
         return true unless conditions
         rslt = case conditions
-          when Proc; strategy.instance_eval &conditions
+          when Proc; strategy.instance_eval(&conditions)
           when String; strategy.send :eval, conditions.to_s
           when Array;
             if conditions.size > 1
@@ -340,6 +360,7 @@ module OmniAuth
           else conditions
         end ? true : false
         #log :debug, "Resolve_conditions for '#{name}' with '#{conditions}' result '#{rslt}'"
+        debug{"Resolve_conditions for '#{name}' with '#{conditions}' result '#{rslt}'"}
         rslt
       end
       
@@ -358,6 +379,8 @@ module OmniAuth
           else proc{self}
         end
         #log :debug, "'#{name}' calling source_target '#{source_target}' on klass_instance '#{strategy}' with code '#{source_code}'."
+        #debug{"'#{name}' calling source_target '#{source_target}' on klass_instance '#{strategy}' with code '#{source_code}'."}
+        
         target_result = case source_target
           when 'default'
             strategy
@@ -373,9 +396,10 @@ module OmniAuth
             source_target
         end
         #log :debug, "Data method '#{name}' with source_target '#{source_target}': #{target_result.class}"
+        #debug{"Data method '#{name}' with source_target '#{source_target}': #{target_result.class}"}
         
         if target_result
-          result = case source_code
+          case source_code
             when Proc
               target_result.instance_eval(&source_code)
             when String
@@ -443,7 +467,8 @@ module OmniAuth
           
           result ||= resolve_default_value strategy
           #log :debug, "Data method '#{name}' returning: #{result}"
-          #result
+          debug{"Data method '#{name}' returning: #{result}"}
+          result
         end
       end
               
