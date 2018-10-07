@@ -3,6 +3,14 @@ require 'omniauth-slack'
 
 class StrategyTest < StrategyTestCase
   include OAuth2StrategyTests
+  
+  test 'includes DataMethods' do
+    assert_equal true, strategy.class.ancestors.include?(OmniAuth::Slack::DataMethods)
+  end
+  
+  test 'defines custom AuthHash subclass' do
+    assert_equal true, strategy.class::AuthHash.ancestors.include?(OmniAuth::Slack::AuthHash)
+  end
 end
 
 class ClientTest < StrategyTestCase
@@ -212,6 +220,62 @@ class InitializeTest < StrategyTestCase
   end
 
 end
+
+class CallbackPhaseTest < StrategyTestCase
+  def setup
+    super
+    strategy.stubs(:session).returns({'omniauth.authorize_params'=>{'team'=>'ABC123'}})
+    strategy.stubs(:env).returns({})
+    # Without this, OAuth2#callback_phase fails during these tests with csrf detected.
+    strategy.stubs('fail!').returns(true)
+  end
+  
+  test "sets env['omniauth.authorize_params'] with session['omniauth.authorize_params']" do
+    strategy.callback_phase
+    assert_equal( {'team'=>'ABC123'}, strategy.env['omniauth.authorize_params'] )
+  end
+  
+  test 'triggers define_additional_data with data from options[:additional_data]' do
+    strategy.options.additional_data = {channels:'123'}
+    strategy.class.expects(:define_additional_data).with({'channels' => '123'})
+    strategy.callback_phase
+  end
+end
+
+class PassThroughParamsTest < StrategyTestCase
+  test 'returns all AUTH_OPTIONS when given :all' do
+    strategy.options.pass_through_params = :all
+    assert_equal strategy.class::AUTH_OPTIONS, strategy.pass_through_params
+  end
+  
+  test 'returns empty array when given :none' do
+    strategy.options.pass_through_params = :none
+    assert_equal [], strategy.pass_through_params
+  end
+  
+  test "returns empty array when given nil" do
+    strategy.options.pass_through_params = nil
+    assert_equal [], strategy.pass_through_params
+  end
+  
+  test "returns specific items when given specific items" do
+    strategy.options.pass_through_params = %w(scope team_domain)
+    assert_equal %w(scope team_domain), strategy.pass_through_params
+  end
+end
+
+class GetAdditionalDataTest < StrategyTestCase
+  test "returns compiled result data from additional_data methods." do
+    additiona_data = {test_additional_data: proc{"yay it works"}}
+    strategy.options.additional_data = additiona_data
+    strategy.class.define_additional_data(additiona_data)
+    #puts strategy.data_methods.test_additional_data.call(strategy)
+    #puts strategy.test_additional_data
+    assert_equal "yay it works", strategy.send(:get_additional_data)['test_additional_data']
+  end
+end
+
+
 
 # class SemaphoreTest < StrategyTestCase
 # 

@@ -145,15 +145,14 @@ module OmniAuth
         end
       end
       
-      def callback_phase(*args)
+      def callback_phase #(*args)
         # This technique copied from OmniAuth::Strategy (this is how they do it for the other omniauth objects).
         env['omniauth.authorize_params'] = session.delete('omniauth.authorize_params')
                 
         # This is trying to help move additiona_data definition away from user-action.
-        #define_additional_data
-        self.class.define_additional_data(env['omniauth.strategy'].options.additional_data)
+        self.class.define_additional_data(options.additional_data)
         
-        super
+        result = super
       end
       
       # Get a new OAuth2::Client and define custom behavior.
@@ -185,18 +184,11 @@ module OmniAuth
       def callback_url
         full_host + script_name + callback_path
       end
-      
-      # TODO: Remove, no longer needed.      
-      # def auth_hash
-      #   define_additional_data #unless skip_info?
-      #   # TODO: Find better way to ensure the auth_hash is the custom one.
-      #   #OmniAuth::Strategies::Slack::AuthHash.new(super)
-      #   super
-      # end
-      
+
       
       private
       
+      # Run/call/compile results from additional_data definitions.
       def get_additional_data
         if false && skip_info?
           {}
@@ -382,7 +374,6 @@ module OmniAuth
         access_token.has_scope?(scope_query, opts)
       end
       
-      # Experimental:
       # Copies the api_ data-methods to AccessToken.
       data_methods.each{|k,v| OmniAuth::Slack::OAuth2::AccessToken.data_method(k, v) if k.to_s[default_options.dependency_filter]}
       
