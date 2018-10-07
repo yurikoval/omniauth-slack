@@ -1,5 +1,4 @@
 require 'helper'
-require 'omniauth-slack'
 
 class TestClass
   attr_accessor :semaphores

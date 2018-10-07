@@ -1,6 +1,4 @@
 require 'helper'
-require 'omniauth-slack'
-
 
 class TestObjectRefinements
   using OmniAuth::Slack::ObjectRefinements

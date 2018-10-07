@@ -1,5 +1,4 @@
 require 'helper'
-require 'omniauth-slack'
 
 describe OmniAuth::Slack::OAuth2::AccessToken do
   def setup
@@ -42,6 +41,24 @@ describe OmniAuth::Slack::OAuth2::AccessToken do
   end
   
   describe 'is_app_token?' do
+    it "is true when params['token_type'] == 'app'" do
+      @access_token.params['token_type'] = 'app'
+      assert_equal true, @access_token.is_app_token?
+    end
+    
+    it "is true when token-string starts with xoxa" do
+      @access_token.token.replace 'xoxa-L1234-ABCD-5678-XXZZ'
+      assert_equal true, @access_token.is_app_token?
+    end
+    
+    it "is false when token-string starts with xoxp" do
+      @access_token.token.replace 'xoxp-L1234-ABCD-5678-XXZZ'
+      assert_equal false, @access_token.is_app_token?
+    end
+    
+    it "is nil when no conditions are met" do
+      assert_nil @access_token.is_app_token?
+    end
   end
   
   describe 'is_identity_token?' do

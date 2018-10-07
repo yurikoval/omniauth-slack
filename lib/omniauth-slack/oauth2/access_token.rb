@@ -17,7 +17,7 @@ module OmniAuth
         #prepend Slack::Semaphore
         
         # Experimental:
-        # Needed to copy Strategy data-methods to access-token without any modification.
+        # Needed to copy Strategy data-methods to access-token without any modification of data-methods.
         def access_token; self; end
 
         %w(user_name user_email team_id team_name team_domain).each do |word|

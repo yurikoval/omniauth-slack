@@ -1,7 +1,28 @@
-require "bundler/setup"
-require "minitest/autorun"
-require "mocha/setup"
-require "omniauth/strategies/slack"
+# Run all tests with
+#   ruby -I./test test/test.rb
+# or
+#   rake test
+# or run specific tests
+#   ruby -I./test test/refinements_test.rb
+#
+$LOAD_PATH.unshift File.expand_path('../../lib', __FILE__)
+$LOAD_PATH.unshift File.expand_path('../support', __FILE__)
+
+# Is specific require-bundler-setup needed?
+#require 'bundler/setup'
+
+require 'minitest/autorun'
+# Must load after minitest-autorun.
+require 'mocha/setup'
+
+# Is explicit require-oauth2 still needed?
+require 'oauth2'
+require 'omniauth-slack'
+
+# See below for require 'shared_examples' (needs to load after helpers).
+#require 'shared_examples'
+
+
 
 OmniAuth.config.test_mode = true
 OmniAuth.logger.level = 1
@@ -56,5 +77,17 @@ class StrategyTestCase < TestCase
   end
 end
 
-Dir[File.expand_path("../support/**/*", __FILE__)].each(&method(:require))
+
+## This needs to load after helpers.
+require 'shared_examples'
+
+
+## These are not used here anymore.
+
+# Dir[File.expand_path("../support/**/*", __FILE__)].each(&method(:require))
+
+# Dir[File.join("../", 'test', '*.rb')].each {|file| require file }
+
+#require_relative 'support/shared_examples.rb'
+#Dir[File.expand_path("../**/*.rb", __FILE__)].each(&method(:require))
 
