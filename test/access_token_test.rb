@@ -10,7 +10,7 @@ describe OmniAuth::Slack::OAuth2::AccessToken do
     
     @at_class = OmniAuth::Slack::OAuth2::AccessToken
     
-    @scope_base = YAML.load_file('test/support/scope_base.yml')
+    @scope_base = YAML.load_file(File.join(File.dirname(__FILE__), 'support/scope_base.yml'))
   end
   
   it 'defines getter methods for basic user data' do
@@ -98,8 +98,37 @@ describe OmniAuth::Slack::OAuth2::AccessToken do
     #   assert_equal true, @at_class.has_scope?(scope_query:['identify', 'channels:read', 'chat:write:bot', 'users.profile:read'], scope_base:@scope_base)
     # end
     
+    it 'accepts a scope_query hash' do
+      assert_equal true, @at_class.has_scope?(scope_query:{channel:'channelss:read im:read', group:'chat:write'}, scope_base:@scope_base)
+    end
+    
     it 'accepts an array of scope_query hashes' do
       assert_equal true, @at_class.has_scope?(scope_query:[{channel:'channelss:read im:read', group:'chat:write'}, {app_home:'chat:write'}], scope_base:@scope_base)
+    end
+
+    it 'accepts a scope_query hash with array of string values' do
+      assert_equal true, @at_class.has_scope?(scope_query:{channel: %w(channelss:read im:read chat:write)}, scope_base:@scope_base)
+    end
+    
+    it "accepts a :logic param to switch to 'and' (all) logic from 'or' (any) logic" do
+      assert_equal false, @at_class.has_scope?(scope_query:{channel:'channels:read im:read', group:'chat:write'}, scope_base:@scope_base, logic:'and')
+      assert_equal true, @at_class.has_scope?(scope_query:{channel:'channels:read im:read', group:'chat:write'}, scope_base:@scope_base, logic:'or')
+      assert_equal false, @at_class.has_scope?(scope_query:{channel:'im:read'}, scope_base:@scope_base)
+    end
+    
+    it "given 'or' logic, must match at least one scope from given scope_query hash" do
+      assert_equal true, @at_class.has_scope?(scope_query:{channel:'channels:read im:read', group:'chat:wrong'}, scope_base:@scope_base, logic:'or')
+      assert_equal false, @at_class.has_scope?(scope_query:{channel:'chappels:read im:read', group:'chat:wrong'}, scope_base:@scope_base, logic:'or')
+    end
+    
+    it "given 'and' logic, must match all scopes from given scope_query hash" do
+      assert_equal true, @at_class.has_scope?(scope_query:{channel:'channels:read channels:history', group:'chat:write'}, scope_base:@scope_base, logic:'and')
+      assert_equal false, @at_class.has_scope?(scope_query:{channel:'channels:read channels:history', group:'chat:write', team:'users:read'}, scope_base:@scope_base, logic:'and')
+    end
+    
+    it "logic for array of query hashes is opposite of logic for query-hash" do
+      assert_equal true, @at_class.has_scope?(scope_query:[{channel:'channels:read im:read'}, {group:'chat:write'}], scope_base:@scope_base, logic:'and')
+      assert_equal false, @at_class.has_scope?(scope_query:[{channel:'channels:read im:read'}, {group:'chat:wrong chat:still.wrong'}], scope_base:@scope_base, logic:'or')
     end
   end
 end

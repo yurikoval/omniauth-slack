@@ -174,7 +174,7 @@ module OmniAuth
           
           _scope_query.send(_logic[:outter]) do |query|
             debug{"Outter Scope Query: #{_scope_query.inspect}"}
-            puts "Outter Scope Query: '#{_logic}' #{_scope_query.inspect}"
+            #puts "Outter Scope Query: '#{_logic}' #{_scope_query.inspect}"
 
             query.send(_logic[:inner]) do |section, scopes|
               test_scopes = case
@@ -185,7 +185,7 @@ module OmniAuth
               
               test_scopes.send(_logic[:inner]) do |scope|
                 debug{"Inner Scope Query section: #{section.to_s}, scope: #{scope}"}
-                puts "Inner Scope Query section: #{section.to_s}, scope: #{scope}"
+                #puts "Inner Scope Query section: #{section.to_s}, scope: #{scope}"
                 _scope_base.to_h[section.to_s].to_a.include?(scope.to_s)
               end
             end
