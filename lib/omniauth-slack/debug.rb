@@ -3,9 +3,14 @@ require 'omniauth-slack/refinements'
 module OmniAuth
   module Slack
     module Debug
-      using ObjectRefinements
+      #using ObjectRefinements
+      LOG_ALL = %w(1 true yes all debug)
+      LOG_NONE = %w(0 false no none)
+      
+      include CallerMethodName
     
       def self.included(other)
+        other.send(:include, CallerMethodName)
         other.send(:extend, Extensions)
       end
     
@@ -14,7 +19,7 @@ module OmniAuth
           method_name ||= caller_method_name
           klass ||= self
           filter = ENV['OMNIAUTH_SLACK_DEBUG']
-          return if filter.nil? || filter.to_s=='' || filter.to_s[/^(nil|nill|no|none|false)$/i]
+          return if filter.nil? || filter.to_s=='' || LOG_NONE.include?(filter.to_s.downcase)   #[/^(nil|nill|no|none|false)$/i]
           klass = case klass
             when Class; klass.name
             when Module; klass.name
@@ -25,7 +30,7 @@ module OmniAuth
           log_text = yield
           full_text = "(#{klass_name} #{method_name}) #{log_text}"
           
-          if ![1, true, 'true', 'yes', 'debug', false, 'false', 'no', 0].include?(filter.to_s.downcase)
+          if filter && !LOG_ALL.include?(filter.to_s.downcase)
             regexp = filter.is_a?(Regexp) ? filter : Regexp.new(filter.to_s, true)
             return unless full_text[regexp]
           end

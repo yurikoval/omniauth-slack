@@ -1,7 +1,9 @@
 require 'helper'
 
-class TestObjectRefinements
-  using OmniAuth::Slack::ObjectRefinements
+#class TestObjectRefinements
+class TestCallerMethodName
+  #using OmniAuth::Slack::ObjectRefinements
+  include OmniAuth::Slack::CallerMethodName
 
   def test_caller_method_name_outter
     test_caller_method_name_middle
@@ -16,11 +18,22 @@ class TestObjectRefinements
   end
 end
 
-describe OmniAuth::Slack::ObjectRefinements do
-  using OmniAuth::Slack::ObjectRefinements
+# describe OmniAuth::Slack::ObjectRefinements do
+#   using OmniAuth::Slack::ObjectRefinements
+#   
+#   describe 'caller_method_name' do
+#     instance = TestObjectRefinements.new
+#     it "gets the name of the method that called the current method" do
+#       assert_equal 'test_caller_method_name_middle', instance.test_caller_method_name_outter
+#     end
+#   end
+# end
+
+describe OmniAuth::Slack::CallerMethodName do
+  #using OmniAuth::Slack::ObjectRefinements
   
   describe 'caller_method_name' do
-    instance = TestObjectRefinements.new
+    instance = TestCallerMethodName.new
     it "gets the name of the method that called the current method" do
       assert_equal 'test_caller_method_name_middle', instance.test_caller_method_name_outter
     end

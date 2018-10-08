@@ -8,7 +8,7 @@ module OmniAuth
   module Slack
     using ArrayRefinements
     using StringRefinements
-    using ObjectRefinements
+    #using ObjectRefinements
   
     class Hashy < Hashie::Hash
       include Hashie::Extensions::MergeInitializer

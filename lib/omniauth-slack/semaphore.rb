@@ -2,11 +2,13 @@ require 'omniauth-slack/refinements'
 
 module OmniAuth
   module Slack
-    using ObjectRefinements
+    #using ObjectRefinements
     
     ### Prepend Semaphore module to get simple mutexes for each/any method.
 
-    module Semaphore    
+    module Semaphore
+      include CallerMethodName
+    
       def initialize(*args)
         super
         @main_semaphore = Mutex.new

@@ -65,13 +65,24 @@ module OmniAuth
       end
     end
     
-    module ObjectRefinements
-      refine Object do
-        # Get name of method that called the current method.
-        def caller_method_name
-          #caller[0][/`([^']*)'/, 1] # This gets the method name only 1 level up.
-          caller[1][/`([^']*)'/, 1]  # This gets the method name 2 levels up.
-        end
+    # module ObjectRefinements
+    #   refine Object do
+    #     # Get name of method that called the current method.
+    #     def caller_method_name
+    #       #caller[0][/`([^']*)'/, 1] # This gets the method name only 1 level up.
+    #       caller[1][/`([^']*)'/, 1]  # This gets the method name 2 levels up.
+    #     end
+    #   end
+    # end
+    
+    module CallerMethodName
+      def caller_method_name
+        #caller[0][/`([^']*)'/, 1] # This gets the method name only 1 level up.
+        caller[1][/`([^']*)'/, 1]  # This gets the method name 2 levels up.
+      end
+      
+      def self.included(other)
+        other.send(:extend, CallerMethodName)
       end
     end
       
