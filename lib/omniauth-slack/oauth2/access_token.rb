@@ -151,7 +151,7 @@ module OmniAuth
         # Match the given scope_query against the given scope_base, with the given logic.
         # This is classic and workspace token compatible.
         # TODO: Remove any code specific to Slack, like classic-vs-workspace handling.
-        # scope_query is a hash (or array of hashes) where:
+        # scope_query is a hash, or array of hashes, where:
         #   key == scope type <app_home|team|channel|group|mpim|im|identity|classic>
         #   val == array or string of individual scopes.
         #   logic == 'and' or 'or' (default).
@@ -163,6 +163,7 @@ module OmniAuth
           _scope_query = scope_query.is_a?(String) ? {classic: scope_query} : scope_query
           _scope_query = [_scope_query].flatten
           _scope_base  = scope_base
+          raise "scope_base must be a hash" unless (_scope_base.is_a?(Hash) || _scope_base.respond_to?(:to_h))
           
           _logic = case
             when logic.to_s.downcase == 'or'; {outter: 'all?', inner: 'any?'}
@@ -173,6 +174,7 @@ module OmniAuth
           
           _scope_query.send(_logic[:outter]) do |query|
             debug{"Outter Scope Query: #{_scope_query.inspect}"}
+            puts "Outter Scope Query: '#{_logic}' #{_scope_query.inspect}"
 
             query.send(_logic[:inner]) do |section, scopes|
               test_scopes = case
@@ -183,6 +185,7 @@ module OmniAuth
               
               test_scopes.send(_logic[:inner]) do |scope|
                 debug{"Inner Scope Query section: #{section.to_s}, scope: #{scope}"}
+                puts "Inner Scope Query section: #{section.to_s}, scope: #{scope}"
                 _scope_base.to_h[section.to_s].to_a.include?(scope.to_s)
               end
             end

@@ -7,6 +7,10 @@ describe OmniAuth::Slack::OAuth2::AccessToken do
       "ABC123DEF456",
       {'user' => {'id' => '11', 'name' => 'bill'}, 'team_id' => 33, 'team_name' => 'my team'}
     )
+    
+    @at_class = OmniAuth::Slack::OAuth2::AccessToken
+    
+    @scope_base = YAML.load_file('test/support/scope_base.yml')
   end
   
   it 'defines getter methods for basic user data' do
@@ -17,6 +21,7 @@ describe OmniAuth::Slack::OAuth2::AccessToken do
   it 'defines access_token to provide universal access for data-methods' do
     assert_equal @access_token, @access_token.access_token
   end
+  
   
   describe 'user_id' do
     it "gets data from params['user'].to_h['id']" do
@@ -84,6 +89,17 @@ describe OmniAuth::Slack::OAuth2::AccessToken do
   describe 'has_scope?' do
   end
   
-  describe 'self.has_scope?' do
+  describe 'self.has_scope?' do    
+    it 'accepts a string of classic scopes to be matched against base-scopes containing :classic key' do
+      assert_equal true, @at_class.has_scope?(scope_query:'identify,channels:read,chat:write:bot,users.profile:read', scope_base:@scope_base)
+    end
+    
+    # it 'DOES NOT accept an array of strings of classic scopes to be matched against base-scopes containing :classic key' do
+    #   assert_equal true, @at_class.has_scope?(scope_query:['identify', 'channels:read', 'chat:write:bot', 'users.profile:read'], scope_base:@scope_base)
+    # end
+    
+    it 'accepts an array of scope_query hashes' do
+      assert_equal true, @at_class.has_scope?(scope_query:[{channel:'channelss:read im:read', group:'chat:write'}, {app_home:'chat:write'}], scope_base:@scope_base)
+    end
   end
 end
