@@ -1,3 +1,5 @@
+require 'omniauth-slack/refinements'
+
 module OmniAuth
   module Slack
     module Debug

@@ -52,8 +52,8 @@ module OmniAuth
         
         # Is this a token returned from an identity-scoped request?
         def is_identity_token?
-          params['user_id'] ||
-          params['user'].to_h['id']
+          (params['user_id'] ||
+          params['user'].to_h['id']) && true || false
         end
       
         # Parsed identity scopes (workspace apps only).

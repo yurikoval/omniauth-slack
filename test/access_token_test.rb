@@ -62,6 +62,20 @@ describe OmniAuth::Slack::OAuth2::AccessToken do
   end
   
   describe 'is_identity_token?' do
+    it "is true if params.user_id" do
+      @access_token.params['user_id'] = 'abc'
+      assert_equal true, @access_token.is_identity_token?
+    end
+    
+    it "is true if params.user.id" do
+      @access_token.params['user'] = {'id' => 'efg'}
+      assert_equal true, @access_token.is_identity_token?
+    end
+    
+    it "is false if not true" do
+      @access_token.params.clear
+      assert_equal false, @access_token.is_identity_token?
+    end
   end
   
   describe 'all_scopes' do
