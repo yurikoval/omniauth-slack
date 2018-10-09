@@ -17,6 +17,8 @@ module OmniAuth
       include Hashie::Extensions::MethodQuery
       # Note that this extensions will introduce procs into the hash, which won't serialize.
       include Hashie::Extensions::IndifferentAccess
+      # What about this one?
+      #include Hashie::Extensions::SymbolizeKeys
       
       def self.inherited(other)
         other.send :include, OmniAuth::Slack::Debug
@@ -202,9 +204,9 @@ module OmniAuth
 
       def self.new(*args)  #(name, klass, optional-default-proc, optional-opts, &optional-block)
         debug{"DataMethod.new with args: #{args}"}
-        opts = Mashy.new(args.last.is_a?(Hash) ? args.pop : {})
+        opts = Hashy.new(args.last.is_a?(Hash) ? args.pop : {})
         new_object = allocate
-        %w(name scope scope_opts condition source storage default_value setup_block info_key klass).each do |property|
+        %w(name scope condition source storage default_value setup_block info_key klass).each do |property|
           new_object[property] = nil
         end
         
@@ -239,25 +241,38 @@ module OmniAuth
       # Expects same args as AccessToken#has_scope?
       #   query == hash or array of hashes
       #   opts (options) == hash of options
+      # def scope(*args)
+      #   return self[__method__] unless args.any?
+      #   self[:scope] ||= []
+      #   #log :debug, "Declaring #{name}.scope: #{args}"
+      #   debug{"Declaring #{name}.scope: #{args}"}
+      #   query = args.shift
+      #   opts = args.last
+      #   self[:scope_opts] = opts if opts
+      #   self[:scope] << query
+      #   self[:scope].flatten!
+      # end
       def scope(*args)
-        return self[__method__] unless args.any?
-        self[:scope] ||= []
-        #log :debug, "Declaring #{name}.scope: #{args}"
+        #return self[__method__] unless (args.any?)
+        raw_scope = self[__method__]
+        unless (args.any?)
+          return case raw_scope
+            when Array; raw_scope
+            when Hash; Hashie::Extensions::SymbolizeKeys.symbolize_keys(raw_scope)
+            else raw_scope
+          end
+        end
         debug{"Declaring #{name}.scope: #{args}"}
-        query = args.shift
-        opts = args.last
-        self[:scope_opts] = opts if opts
-        self[:scope] << query
-        self[:scope].flatten!
+        self[:scope] = args #.flatten.compact
       end
       
-      # Get/set scope_opts (:and | :or).
-      def scope_opts(opts={})
-        return self[__method__] unless opts && opts.any?
-        #log :debug, "Declaring #{name}.scope_opts: #{opts}"
-        debug{"Declaring #{name}.scope_opts: #{opts}"}
-        self[:scope_opts] = opts
-      end
+      # # Get/set scope_opts (:and | :or).
+      # def scope_opts(opts={})
+      #   return self[__method__] unless opts && opts.any?
+      #   #log :debug, "Declaring #{name}.scope_opts: #{opts}"
+      #   debug{"Declaring #{name}.scope_opts: #{opts}"}
+      #   self[:scope_opts] = opts
+      # end
       
       # Get/set sources.
       def source(*args) # (optional-name, optional-proc, optional-opts, &optional-block)
@@ -365,9 +380,19 @@ module OmniAuth
       end
       
       # Resolve all scope queries and return true/false.
-      def resolve_scopes(strategy)
+      def resolve_scope(strategy)
         scopes = scope
-        (scopes && scopes.size > 0) ? strategy.send(:has_scope?, scopes, scope_opts) : true
+        case scopes
+          when NilClass; true
+          when :empty?.to_proc; true
+          when Array;
+            debug{"Resolve_scope array #{scopes}"}
+            strategy.send(:has_scope?, *scopes)
+          when Hash;
+            debug{"resolve_scope hash #{scopes}"}
+            strategy.send(:has_scope?, **scopes)
+          else raise "Scope query object #{scopes} was not handled."
+        end
       end
       
       # Resolve a single source-hash.
@@ -458,7 +483,7 @@ module OmniAuth
       def call(strategy)
         with_cache(strategy) do
           result = nil
-          resolve_scopes(strategy) &&
+          resolve_scope(strategy) &&
           resolve_conditions(strategy) &&
           select_sources(strategy).each do |src|
             result = resolve_source(src, strategy)

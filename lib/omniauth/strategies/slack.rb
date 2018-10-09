@@ -369,9 +369,9 @@ module OmniAuth
       #   key == scope type <identity|app_home|team|channel|group|mpim|im>
       #   val == array or string of individual scopes.
       # TODO: Something not working here since and/or option was built.
-      def has_scope?(scope_query, opts={})
+      def has_scope?(*args)
         #opts.merge!(base_scopes: auth_hash.credentials.scope)
-        access_token.has_scope?(scope_query, opts)
+        access_token.has_scope?(*args)
       end
       
       # Copies the api_ data-methods to AccessToken.

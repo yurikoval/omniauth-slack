@@ -102,10 +102,11 @@ module OmniAuth
           end
         end
       
+        # TODO: Update this documentation to fit new has_scope method below.
         # AccessToken instance has_scope?
         # Determine if given scopes exist on the current access token.
         # This is classic and workspace token compatible.
-        # TODO: does this accept all slack token types?
+        # TODO: does this accept all slack token types? What about bot tokens? Others?
         # scope_query is a hash where:
         #   key == scope type <app_home|team|channel|group|mpim|im|identity|classic>
         #   val == array or string of individual scopes.
@@ -115,36 +116,59 @@ module OmniAuth
         #     logic
         # If scope_query is a string, it will be interpreted as {classic: scope_query}
         #
-        def has_scope?(scope_query, opts={})
-          debug{"HasScope: #{scope_query} with opts: '#{opts}'"}
-          # Experimental: accept array of scope-query arrays.
-          # I don't think we want to do this.
-          # if scope_query.is_a?(Array) && scope_query[0].is_a?(Array)
-          #   puts "Processing list of scope queries"
-          #   return scope_query.all?{|query| puts "Processing scope query: #{query}"; has_scope?(*query)}
-          # end
-          opts ||= {}         
-          user = opts[:user_id] || user_id
-          scope_query = [scope_query].flatten
-          debug{"AccessToken#has_scope with user '#{user}' scope_query '#{scope_query}' opts '#{opts}'"}
-          
-          logic = opts[:logic] || 'or'
-          
-          scope_base = case
-            when opts[:base_scopes]
-              debug{"Base Scopes: opts[:base_scopes]"}
-              opts[:base_scopes]
-            #when user && query.is_a?(Hash) && query.keys.detect{|k| k.to_s == 'identity'}
-            when user && scope_query.detect{ |q| q.is_a?(Hash) && q.keys.detect{|k| k.to_s == 'identity'} }
-              debug{"Base scopes using: all_scopes(user)"}
+        #   def has_scope?(scope_query, opts={})
+        #     debug{"HasScope: #{scope_query} with opts: '#{opts}'"}
+        #     # Experimental: accept array of scope-query arrays.
+        #     # I don't think we want to do this.
+        #     # if scope_query.is_a?(Array) && scope_query[0].is_a?(Array)
+        #     #   puts "Processing list of scope queries"
+        #     #   return scope_query.all?{|query| puts "Processing scope query: #{query}"; has_scope?(*query)}
+        #     # end
+        #     opts ||= {}         
+        #     user = opts[:user_id] || user_id
+        #     scope_query = [scope_query].flatten
+        #     debug{"AccessToken#has_scope with user '#{user}' scope_query '#{scope_query}' opts '#{opts}'"}
+        #     
+        #     logic = opts[:logic] || 'or'
+        #     
+        #     scope_base = case
+        #       when opts[:base_scopes]
+        #         debug{"Base Scopes: opts[:base_scopes]"}
+        #         opts[:base_scopes]
+        #       #when user && query.is_a?(Hash) && query.keys.detect{|k| k.to_s == 'identity'}
+        #       when user && scope_query.detect{ |q| q.is_a?(Hash) && q.keys.detect{|k| k.to_s == 'identity'} }
+        #         debug{"Base scopes using: all_scopes(user)"}
+        #         all_scopes(user)
+        #       else
+        #         debug{"Base scopes using: all_scopes"}
+        #         all_scopes
+        #     end
+        #     
+        #     self.class.has_scope?(scope_query: scope_query, scope_base: scope_base, logic: logic)
+        #   end # has_scope?
+        #
+        #
+        # NOTE: # The keyword keys need to be symbols, therefore any
+        # hash passed in needs to have symbolized keys!
+        def has_scope?(*freeform_array, query: nil, logic:'or', user:nil, base:nil, **freeform_hash)
+          query ||= case
+            when freeform_array.any?; freeform_array
+            when freeform_hash.any?; freeform_hash
+          end
+          return unless query
+          query = [query].flatten if query.is_a?(Array)
+          user ||= user_id
+
+          base ||= case
+            when user && query.detect{ |q| q.is_a?(Hash) && q.keys.detect{|k| k.to_s == 'identity'} }
               all_scopes(user)
             else
-              debug{"Base scopes using: all_scopes"}
               all_scopes
           end
           
-          self.class.has_scope?(scope_query: scope_query, scope_base: scope_base, logic: logic)
-        end # has_scope?
+          debug{[freeform_array:freeform_array, freeform_hash:freeform_hash, query:query, logic:logic, user:user, base:base}]}
+          self.class.has_scope?(scope_query:query, scope_base:base, logic:logic)
+        end
         
                 
         # Class-level has_scope? with no token or state dependencies.
