@@ -166,7 +166,7 @@ module OmniAuth
               all_scopes
           end
           
-          debug{[freeform_array:freeform_array, freeform_hash:freeform_hash, query:query, logic:logic, user:user, base:base}]}
+          debug{{freeform_array:freeform_array, freeform_hash:freeform_hash, query:query, logic:logic, user:user, base:base}}
           self.class.has_scope?(scope_query:query, scope_base:base, logic:logic)
         end
         

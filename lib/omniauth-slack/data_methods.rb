@@ -25,7 +25,9 @@ module OmniAuth
       end
     end
     
-    class Mashy < Hashie::Mash
+    #class Mashy < Hashie::Mash
+    # TODO: Decide if we need Mashy, or if we can just use Hashy (or even Hash).
+    class Mashy < Hashy
     end
 
     # DataMethods: declarative method dependency management.
