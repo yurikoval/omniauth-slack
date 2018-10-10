@@ -16,16 +16,6 @@ module OAuth2StrategyTests
       @options = { :client_options => { "authorize_url" => "https://example.com" } }
       assert_equal "https://example.com", strategy.client.options[:authorize_url]
     end
-    
-    test "should transfer team_domain from options to client.site uri" do
-      @options = { :team_domain => 'subdomain' }
-      assert_equal "https://subdomain.slack.com", strategy.client.site
-    end
-    
-    test "should transfer team_domain from request.params to client.site uri" do
-      @request.stubs(:params).returns({ 'team_domain' => 'subdomain2' })
-      assert_equal "https://subdomain2.slack.com", strategy.client.site
-    end
   end
 
   module AuthorizeParamsTests
