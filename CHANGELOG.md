@@ -1,3 +1,18 @@
+## v2.4.1(2018-09-18)
+
+* Set `client_options[:auth_scheme]` to `:basic_auth`, as OAuth2 gem does not yet make this the default. [wbr]
+
+* Stop using `:setup` option to manipulate site uri subdomain. [wbr]
+
+* Override `client` method to manipulate site uri subdomain. [wbr]
+
+* Allow `apps.permissions.users.list` call to be excluded by user. [wbr]
+
+* Fix gemspec dep for omniauth-oauth2. [wbr]
+
+* Add experimental class method `ad_hoc_client`. [wbr]
+
+
 ## v2.4.0 (2018-08-28)
 
 Initial release of ginjo-omniauth-slack
