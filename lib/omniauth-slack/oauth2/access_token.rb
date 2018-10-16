@@ -83,6 +83,7 @@ module OmniAuth
         # Get all scopes, including apps.permissions.users.list if user_id.
         # This now puts all compiled scopes back into params['scopes']
         def all_scopes(_user_id=nil)
+          debug{"_user_id: #{_user_id}, @all_scopes: #{@all_scopes}"}
           if _user_id && !@all_scopes.to_h.has_key?('identity') || @all_scopes.nil?
             @all_scopes = (
               scopes = case
@@ -116,57 +117,39 @@ module OmniAuth
         #     logic
         # If scope_query is a string, it will be interpreted as {classic: scope_query}
         #
-        #   def has_scope?(scope_query, opts={})
-        #     debug{"HasScope: #{scope_query} with opts: '#{opts}'"}
-        #     # Experimental: accept array of scope-query arrays.
-        #     # I don't think we want to do this.
-        #     # if scope_query.is_a?(Array) && scope_query[0].is_a?(Array)
-        #     #   puts "Processing list of scope queries"
-        #     #   return scope_query.all?{|query| puts "Processing scope query: #{query}"; has_scope?(*query)}
-        #     # end
-        #     opts ||= {}         
-        #     user = opts[:user_id] || user_id
-        #     scope_query = [scope_query].flatten
-        #     debug{"AccessToken#has_scope with user '#{user}' scope_query '#{scope_query}' opts '#{opts}'"}
-        #     
-        #     logic = opts[:logic] || 'or'
-        #     
-        #     scope_base = case
-        #       when opts[:base_scopes]
-        #         debug{"Base Scopes: opts[:base_scopes]"}
-        #         opts[:base_scopes]
-        #       #when user && query.is_a?(Hash) && query.keys.detect{|k| k.to_s == 'identity'}
-        #       when user && scope_query.detect{ |q| q.is_a?(Hash) && q.keys.detect{|k| k.to_s == 'identity'} }
-        #         debug{"Base scopes using: all_scopes(user)"}
-        #         all_scopes(user)
-        #       else
-        #         debug{"Base scopes using: all_scopes"}
-        #         all_scopes
-        #     end
-        #     
-        #     self.class.has_scope?(scope_query: scope_query, scope_base: scope_base, logic: logic)
-        #   end # has_scope?
-        #
-        #
         # NOTE: # The keyword keys need to be symbols, therefore any
         # hash passed in needs to have symbolized keys!
         def has_scope?(*freeform_array, query: nil, logic:'or', user:nil, base:nil, **freeform_hash)
+          debug{{freeform_array:freeform_array, freeform_hash:freeform_hash, query:query, logic:logic, user:user, base:base}}
+          #OmniAuth.logger.debug({freeform_array:freeform_array, freeform_hash:freeform_hash, query:query, logic:logic, user:user, base:base})
+          
           query ||= case
             when freeform_array.any?; freeform_array
             when freeform_hash.any?; freeform_hash
           end
           return unless query
+          
           query = [query].flatten if query.is_a?(Array)
           user ||= user_id
-
+          debug{"using user '#{user}' and query '#{query}'"}
+          
+          is_identity_query = case query
+            when Hash
+              query.keys.detect{|k| k.to_s == 'identity'}
+            when Array
+              query.detect{ |q| q.is_a?(Hash) && q.keys.detect{|k| k.to_s == 'identity'} }
+          end
+          
           base ||= case
-            when user && query.detect{ |q| q.is_a?(Hash) && q.keys.detect{|k| k.to_s == 'identity'} }
+            when user && is_identity_query
+              debug{"calling all_scopes(user=#{user}) to build base-scopes"}
               all_scopes(user)
             else
+              debug{"calling all_scopes to build base-scopes"}
               all_scopes
           end
           
-          debug{{freeform_array:freeform_array, freeform_hash:freeform_hash, query:query, logic:logic, user:user, base:base}}
+          #debug{{freeform_array:freeform_array, freeform_hash:freeform_hash, query:query, logic:logic, user:user, base:base}}
           self.class.has_scope?(scope_query:query, scope_base:base, logic:logic)
         end
         
@@ -183,7 +166,7 @@ module OmniAuth
         # TODO: Can this be added to OAuth2::AccessToken as a generic has_scope? Would it work for other providers?
         #
         def self.has_scope?(scope_query:{}, scope_base:{}, logic:'or')
-          debug{"AccessToken.has_scope? scope_query '#{scope_query}' scope_base '#{scope_base}' logic '#{logic}'"}
+          debug{"class-level-has_scope? scope_query '#{scope_query}' scope_base '#{scope_base}' logic '#{logic}'"}
           _scope_query = scope_query.is_a?(String) ? {classic: scope_query} : scope_query
           _scope_query = [_scope_query].flatten
           _scope_base  = scope_base
@@ -194,11 +177,10 @@ module OmniAuth
             when logic.to_s.downcase == 'and'; {outter: 'any?', inner: 'all?'}
             else {outter: 'all?', inner: 'any?'}
           end
-          debug{"Scope Logic #{_logic.inspect}"}
+          debug{"logic #{_logic.inspect}"}
           
           _scope_query.send(_logic[:outter]) do |query|
-            debug{"Outter Scope Query: #{_scope_query.inspect}"}
-            #puts "Outter Scope Query: '#{_logic}' #{_scope_query.inspect}"
+            debug{"outter query: #{_scope_query.inspect}"}
 
             query.send(_logic[:inner]) do |section, scopes|
               test_scopes = case
@@ -208,8 +190,7 @@ module OmniAuth
               end
               
               test_scopes.send(_logic[:inner]) do |scope|
-                debug{"Inner Scope Query section: #{section.to_s}, scope: #{scope}"}
-                #puts "Inner Scope Query section: #{section.to_s}, scope: #{scope}"
+                debug{"inner query section: #{section.to_s}, scope: #{scope}"}
                 _scope_base.to_h[section.to_s].to_a.include?(scope.to_s)
               end
             end

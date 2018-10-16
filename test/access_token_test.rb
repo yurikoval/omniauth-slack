@@ -84,6 +84,8 @@ describe OmniAuth::Slack::OAuth2::AccessToken do
   end
   
   describe 'all_scopes' do
+    it 'calls apps_permissions_users_list if passed a user_id' do
+    end
   end
   
   describe 'has_scope?' do
