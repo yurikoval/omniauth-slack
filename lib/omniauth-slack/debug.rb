@@ -5,7 +5,7 @@ module OmniAuth
     module Debug
       #using ObjectRefinements
       LOG_ALL = %w(1 true yes all debug)
-      LOG_NONE = %w(0 false no none)
+      LOG_NONE = %w(0 false no none nil nill null)
       
       include CallerMethodName
     
@@ -19,7 +19,7 @@ module OmniAuth
           method_name ||= caller_method_name
           klass ||= self
           filter = ENV['OMNIAUTH_SLACK_DEBUG']
-          return if filter.nil? || filter.to_s=='' || LOG_NONE.include?(filter.to_s.downcase)   #[/^(nil|nill|no|none|false)$/i]
+          return if filter.nil? || filter.to_s=='' || LOG_NONE.include?(filter.to_s.downcase)
           klass = case klass
             when Class; klass.name
             when Module; klass.name
