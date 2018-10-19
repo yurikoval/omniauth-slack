@@ -23,8 +23,9 @@ module OmniAuth
       option :authorize_options, AUTH_OPTIONS - %w(team_domain)
       option :pass_through_params, ['team']
       option :preload_data_with_threads, 0
-      #option :additional_data, {}
       option :dependency_filter, /^api_/
+      option :dependencies
+      option :additional_data
 
       option :client_options, {
         site: 'https://slack.com',
