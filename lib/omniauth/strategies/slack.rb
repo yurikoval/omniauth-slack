@@ -234,8 +234,7 @@ module OmniAuth
         storage: :identity,
         default_value: {},
         source: [
-          # TODO: This line can be simplified by not converting AT to hash.
-          {name: :access_token, code: proc{ r = to_hash.select{|k,v| ['user', 'team'].include?(k.to_s)}; r.any? && r} },
+          {name: :access_token, code: proc{ r = params.select{|k,v| ['user', 'team'].include?(k.to_s)}; r.any? && r} },
           {name: :api_users_identity}
         ]
                     
@@ -365,17 +364,11 @@ module OmniAuth
         env['omniauth.authorize_params'].to_h['scope']
       end
 
-      # Determine if given scopes exist in current authorization.
-      # scopes_hash is hash where:
-      #   key == scope type <identity|app_home|team|channel|group|mpim|im>
-      #   val == array or string of individual scopes.
-      # TODO: Something not working here since and/or option was built.
       def has_scope?(*args)
-        #opts.merge!(base_scopes: auth_hash.credentials.scope)
         access_token.has_scope?(*args)
       end
       
-      # Copies the api_ data-methods to AccessToken.
+      # Copies the api_* data-methods to AccessToken.
       data_methods.each{|k,v| OmniAuth::Slack::OAuth2::AccessToken.data_method(k, v) if k.to_s[default_options.dependency_filter]}
       
     end # Slack

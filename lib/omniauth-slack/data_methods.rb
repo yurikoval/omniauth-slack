@@ -15,10 +15,8 @@ module OmniAuth
       #include Hashie::Extensions::MethodReader
       include Hashie::Extensions::MethodAccess
       include Hashie::Extensions::MethodQuery
-      # Note that this extensions will introduce procs into the hash, which won't serialize.
+      # Note that this extension will introduce procs into the hash, which won't serialize.
       include Hashie::Extensions::IndifferentAccess
-      # What about this one?
-      #include Hashie::Extensions::SymbolizeKeys
       
       def self.inherited(other)
         other.send :include, OmniAuth::Slack::Debug
