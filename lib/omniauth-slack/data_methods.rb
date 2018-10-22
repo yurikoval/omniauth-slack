@@ -10,6 +10,14 @@ module OmniAuth
     using StringRefinements
     #using ObjectRefinements
   
+    # Enhanced hash class based on Hashie.
+    # Includes the following feature additions
+    #
+    # * Merge initializer for creating new instances
+    # * Accessor methods (read & write) for each attribute
+    # * Query methods for each attribute
+    # * Indifferent access (method, symbol, string)
+    #
     class Hashy < Hashie::Hash
       include Hashie::Extensions::MergeInitializer
       #include Hashie::Extensions::MethodReader
@@ -21,11 +29,6 @@ module OmniAuth
       def self.inherited(other)
         other.send :include, OmniAuth::Slack::Debug
       end
-    end
-    
-    #class Mashy < Hashie::Mash
-    # TODO: Decide if we need Mashy, or if we can just use Hashy (or even Hash).
-    class Mashy < Hashy
     end
 
     # DataMethods: declarative method dependency management.
@@ -278,7 +281,7 @@ module OmniAuth
       def source(*args) # (optional-name, optional-proc, optional-opts, &optional-block)
         #return self[__method__] unless args.any?
         return source_array unless args.any?
-        opts = args.last.is_a?(Hash) ? args.pop : Mashy.new
+        opts = args.last.is_a?(Hash) ? args.pop : Hashy.new
         source_name = args.shift if [String, Symbol].any?{|t| args[0].is_a?(t)}
         code = case
           when block_given?; Proc.new
@@ -290,17 +293,17 @@ module OmniAuth
         self[:source] ||= Hashie::Array.new
         #log :debug, "Declaring #{source_name}.source: #{name}, #{opts}, #{prc}"
         debug{"Declaring source :#{source_name} for #{name}: #{opts}, #{code}"}
-        source_hash = Mashy.new({name: source_name, code: code}.merge(opts))
+        source_hash = Hashy.new({name: source_name, code: code}.merge(opts))
         self[:source] << source_hash
       end
       
       def source_array
         Hashie::Array.new.concat( [self[:source]].flatten(1).compact.map do |v|
           case v
-          when Hash; Mashy.new(v)
-          when String; Mashy.new(name: 'default', code: proc{eval(v)})
-          when Proc; Mashy.new(name: 'default', code: v)
-          else Mashy.new(name: 'unknown', code: v)
+          when Hash; Hashy.new(v)
+          when String; Hashy.new(name: 'default', code: proc{eval(v)})
+          when Proc; Hashy.new(name: 'default', code: v)
+          else Hashy.new(name: 'unknown', code: v)
           end
         end)
       end

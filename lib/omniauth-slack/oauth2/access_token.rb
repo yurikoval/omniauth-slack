@@ -8,14 +8,15 @@ module OmniAuth
     using StringRefinements
     
     module OAuth2
+      # Enhanced subclass of OAuth2::AccessToken, used by OmniAuth::Slack
+      # whenever an OAuth2::AccessToken is required.
+      #
+      # Adds class and instance scope-query method +has_scope?+, and adds
+      # basic API data methods and access methods.
       class AccessToken < ::OAuth2::AccessToken        
         include OmniAuth::Slack::DataMethods
         include OmniAuth::Slack::Debug
-                
-        # This is automatic if DataMethods are included.
-        #require 'omniauth-slack/semaphore'
-        #prepend Slack::Semaphore
-        
+
         # AccessToken instance (self), so Strategy data-methods can be copied to AccessToken without modification.
         def access_token; self; end
 
@@ -124,13 +125,13 @@ module OmniAuth
           end
         end
         
-        # TODO: Does this accept all slack token types? What about bot tokens? Others?
-        #
         # Match a given set of scopes against this token's awarded scopes,
         # classic and workspace token compatible.
         #
         # If the scope-query is a string, it will be interpreted as a Slack Classic App
         # scope string +{classic: scope-query-string}+.
+        #
+        # TODO: Does this accept all slack token types? What about bot tokens? Others?
         #
         # The keywords need to be symbols, so any hash passed as an argument
         # (or as the entire set of args) should have symbolized keys!
