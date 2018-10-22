@@ -8,7 +8,6 @@ module OmniAuth
   module Slack
     using ArrayRefinements
     using StringRefinements
-    #using ObjectRefinements
   
     # Enhanced hash class based on Hashie.
     # Includes the following feature additions
@@ -31,45 +30,28 @@ module OmniAuth
       end
     end
 
-    # DataMethods: declarative method dependency management.
-    # 
-    # - Get the most data from the fewest API calls.
-    # - Assign data gateway priority for methods that can pull from multiple gateways.
-    # - Skip a descendant path traversal now, when you know the end point is going to be blocked/down.
+    # Declarative method dependency management.
+    # :markup: rdoc
     #
-    # Include DataMethods module in your OmniAuth::Strategy class
-    # to gain flexible method dependency management.
-    # Control which data_methods get called and in what priority
-    # with the provider block option 'dependencies':
+    # Goals
     #
-    #   provider ...
-    #     dependencies 'my_api_method', 'another_api_method'
-    #   end
+    # * Get the most data from the fewest API calls.
+    # * Consider scopes required for each API call.
+    # * Define additional conditions to be met for each API call.
+    # * Assign data source priority for methods that can pull from multiple sources.
+    # * Skip descendant source traversal, when the end point is known to be blocked/down.
     #
-    # Example data-method declaration in the Strategy class:
+    # Include +DataMethods+ module in your +OmniAuth::Strategy+ class or in your
+    # +OAuth2::AccessToken+ class to gain flexible method dependency management.
+    # Control which data-methods get called and in what priority
+    # with the +OmniAuth::Builder+ block provider option +:dependencies+.
     #
-    # data_method :my_api_method do
-    #   scope classic:'identity.basic', identity:'identity:read:user'
-    #   scope team:'conversations:read', app_home:'chat:write'
-    #   scope_logic: 'or'  # override the default logic (or) within each scope query.
-    #   storage true  # override the name of the cache variable. default is method-name. false disables cache for this method.
-    #   condition proc{ true }
-    #   condition proc{ ! false }
-    #   default_value Hash.new
-    #   source :access_token do
-    #     get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
-    #   end
-    # end
+    #   provider :slack, KEY, SECRET, dependencies: (['my_api_method', 'another_api_method'])
     #
-    # data_method :user_name do
-    #   source :my_api_method do
-    #     user.name
-    #   end
-    # end
-
     module DataMethods
       include OmniAuth::Slack::Debug
-          
+      
+      # Perform operations on the class that included DataMethods.
       def self.included(other)
         #OmniAuth.logger.debug "#{other} included #{self}"
         debug{"#{other} included #{self}"}
@@ -83,10 +65,17 @@ module OmniAuth
         end
       end
       
-      # Strategy instance dependencies.
+      # Strategy instance data-method dependencies.
+      # :markup: tomdoc
+      #
+      # If given a filter, returns a filtered master dependency list.
+      #
+      # Otherwise returns the user-defined dependency list, or the class-level
+      # dependency list with the user (or default) filter applied.
+      #
+      # filter  - Regexp matching desired data-method names (default: nil)
+      #
       def dependencies(filter=nil)
-        # If you provide a filter, this will return the master dependency list (filtered).
-        # Otherwise return the user-defined dependencies, or the class-level deps with the user (or default) filter applied.
         raw = if !filter.nil?
           self.class.dependencies(filter).keys
         else
@@ -200,9 +189,39 @@ module OmniAuth
     end # DataMethods
 
 
-
-    #####  DataMethod Class  #####
-
+    # A DataMethod instance holds the logic, scope, conditions, and sources
+    # of a defined data-method.
+    #
+    # When a data method is defined with the class method +data_method+,
+    # and passed a block, the block is evaluated in the context of the
+    # associated DataMethod instance.
+    #
+    # The instance methods of DataMethod are used to facilitate
+    # setting the attributes of the data-method.
+    #
+    # Example data-method definition in the Strategy class:
+    # 
+    #   data_method :my_api_method do
+    #     scope classic:'identity.basic', identity:'identity:read:user'
+    #     scope team:'conversations:read', app_home:'chat:write'
+    #     # override the default logic (or) within each scope query.
+    #     scope_logic 'or'
+    #     # override the name of the cache variable. default is method-name. false disables cache for this method.
+    #     storage true
+    #     condition proc{ true }
+    #     condition proc{ ! false }
+    #     default_value Hash.new
+    #     source :access_token do
+    #       get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
+    #     end
+    #   end
+    #   
+    #   data_method :user_name do
+    #     source :my_api_method do
+    #       user.name
+    #     end
+    #   end
+    #
     class DataMethod < Hashy
 
       def self.new(*args)  #(name, klass, optional-default-proc, optional-opts, &optional-block)

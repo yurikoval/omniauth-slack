@@ -22,10 +22,12 @@ module OmniAuth
       option :name, 'slack'
       option :authorize_options, AUTH_OPTIONS - %w(team_domain)
       option :pass_through_params, ['team']
+      # TODO: Should these be in DataMethods module?
       option :preload_data_with_threads, 0
+      option :additional_data
+      # TODO: Should these be in DataMethods module?
       option :dependency_filter, /^api_/
       option :dependencies
-      option :additional_data
 
       option :client_options, {
         site: 'https://slack.com',

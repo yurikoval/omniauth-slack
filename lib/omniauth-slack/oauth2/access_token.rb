@@ -1,3 +1,5 @@
+# :markup: tomdoc
+
 require 'oauth2/access_token'
 require 'omniauth-slack/refinements'
 require 'omniauth-slack/data_methods'
@@ -131,8 +133,6 @@ module OmniAuth
         # If the scope-query is a string, it will be interpreted as a Slack Classic App
         # scope string +{classic: scope-query-string}+.
         #
-        # TODO: Does this accept all slack token types? What about bot tokens? Others?
-        #
         # The keywords need to be symbols, so any hash passed as an argument
         # (or as the entire set of args) should have symbolized keys!
         #
@@ -151,6 +151,8 @@ module OmniAuth
         #                     defaults to the awarded scopes on this token
         #
         # freeform_hash     - [**Hash] default: {}, interpreted as single scope query hash
+        #
+        # TODO: Does this accept all slack token types? What about bot tokens? Others?
         #
         def has_scope?(*freeform_array, query: nil, logic:'or', user:nil, base:nil, **freeform_hash)
           debug{{freeform_array:freeform_array, freeform_hash:freeform_hash, query:query, logic:logic, user:user, base:base}}
