@@ -101,7 +101,8 @@ module OmniAuth
           web_hook_info: web_hook_info,
           bot_info: access_token['bot'] || api_bots_info['bot'],
           access_token_hash: access_token.to_hash,
-          identity: @identity,
+          #identity: @identity,
+          identity: @api_users_identity,
           user_info: @api_users_info,
           user_profile: @api_users_profile,
           team_info: @api_team_info,
@@ -213,14 +214,6 @@ module OmniAuth
         access_token.team_id
       end
 
-      def user_identity
-        identity['user'].to_h
-      end
-
-      def team_identity
-        identity['team'].to_h
-      end
-
       def web_hook_info
         #return {} unless access_token.key? 'incoming_webhook'
         access_token['incoming_webhook']
@@ -231,52 +224,42 @@ module OmniAuth
       # The block is evaluated in the context of the new DataMethod instance.
       # Use the DSL methods within the block to contruct the DataMethod instance.
       # See data_methods.rb for available DSL methods.
-
-      data_method :identity,
-        storage: :identity,
-        default_value: {},
-        source: [
-          {name: :access_token, code: proc{ r = params.select{|k,v| ['user', 'team'].include?(k.to_s)}; r.any? && r} },
-          {name: :api_users_identity}
-        ]
                     
       data_method :user_name, info_key: 'name', storage: :user_name, source: [
         {name: 'access_token', code: 'user_name'},
-        {name: 'user_identity', code: "fetch('name',nil)"},
+        {name: 'api_users_identity', code: "self['user'].to_h.fetch('name',nil)"},
         {name: 'api_users_info', code: "fetch('user',{}).to_h['real_name']"},
         {name: 'api_users_profile', code: "fetch('profile',{}).to_h['real_name']"}
       ]
       
       data_method :user_email, info_key: 'email', storage: :user_email, source: [
         {name: 'access_token', code: "user_email"},
-        {name: 'user_identity', code: "fetch('email',nil)"},
+        {name: 'api_users_identity', code: "self['user'].to_h.fetch('email',nil)"},
         {name: 'api_users_info', code: "fetch('user',{}).to_h['profile'].to_h['email']"},
         {name: 'api_users_profile', code: "fetch('profile',{}).to_h['email']"}
       ]
       
       data_method :image do
         source(:access_token) { self['user'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
-        source(:user_identity) { find{|k,v| k.to_s[/image_/]}.to_a[1] }
+        source(:api_users_identity){ self['user'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
         source(:api_users_info) { self['user'].to_h['profile'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
         source(:api_users_profile) { self['profile'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
       end
       
       data_method :team_name do
         source(:access_token) { team_name }
-        source(:team_identity) { self['name'] }
+        source(:api_users_identity){ self['team'].to_h['name'] }
         source(:api_team_info) { self['team'].to_h['name'] }
       end
       
       data_method :team_domain do
         source(:access_token) { self['team'].to_h['domain'] }
-        source(:team_identity) { self['domain'] }
         source(:api_users_identity) { self['team'].to_h['domain'] }
         source(:api_team_info) { self['team'].to_h['domain'] }
       end
       
       data_method :team_image do
         source(:access_token) { self['team'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
-        source(:team_identity) { find{|k,v| k.to_s[/image_/]}.to_a[1] }
         source(:api_users_identity) { self['team'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
         source(:api_team_info) { self['team'].to_h['icon'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
       end
@@ -290,11 +273,8 @@ module OmniAuth
       end
                   
       data_method :nickname do
-        #source(:api_users_info) { self['user'].to_h['profile'].to_h['display_name'] }
         source(:api_users_info) { deep_find 'display_name' }
-        #source(:api_users_info) { self['user'].to_h['name'] }
         source(:api_users_info) { deep_find 'name' }
-        #source(:api_users_profile) { self['profile'].to_h['display_name'] }
         source(:api_users_profile) { deep_find 'display_name' }
       end
 

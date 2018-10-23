@@ -30,8 +30,9 @@ module OmniAuth
       end
     end
 
-    # Declarative method dependency management.
     # :markup: rdoc
+    #
+    # Declarative method dependency management.
     #
     # Goals
     #
@@ -493,11 +494,17 @@ module OmniAuth
       
       # Wrap this around a block to cache result as ivar @<name-of-method>.
       def with_cache(strategy, &block)
-        storage_name = storage || name
-        ivar_data = strategy.instance_variable_get("@#{storage_name}")
-        return ivar_data if ivar_data
+        storage_name = case storage
+          when false; false
+          when nil; name
+          when storage; storage
+        end
+        if storage_name
+          ivar_data = strategy.instance_variable_get("@#{storage_name}")
+          return ivar_data if ivar_data
+        end
         result = yield
-        strategy.instance_variable_set("@#{storage_name}", result) if result && storage_name && storage != false
+        strategy.instance_variable_set("@#{storage_name}", result) if result && storage_name
         result
       end
       
