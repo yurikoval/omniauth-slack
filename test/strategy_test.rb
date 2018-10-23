@@ -155,30 +155,34 @@ class CredentialsTest < StrategyTestCase
   end
 end
 
-class IdentityTest < StrategyTestCase
+# The :identity method no longer exists, but this setup may still be useful.
+#
+# class IdentityTest < StrategyTestCase
+# 
+#   def setup
+#     super
+#     @access_token = stub("OmniAuth::Slack::OAuth2::AccessToken")
+#     @access_token.stubs(:[])
+#     @access_token.stubs(:params)
+#     @access_token.stubs(:token)
+#     @access_token.stubs(:to_hash).returns({})
+#     @access_token.stubs(:user_id).returns(nil)
+#     strategy.stubs(:access_token).returns(@access_token)
+#     strategy.stubs(:has_scope?).returns true
+#     strategy.stubs(:is_not_excluded?).returns true
+#     strategy.stubs(:skip_info?).returns false
+#   end
+#   
+#   # There should be 3 of these, one for each condition of the 'case' statement.
+#   test "performs a GET to https://slack.com/api/users.identity" do
+#     @access_token.expects(:get).with("/api/users.identity", {:headers => {"X-Slack-User" => nil}})
+#       .returns(stub_everything("OAuth2::Response"))
+#     strategy.send :identity
+#   end
+# end
 
-  def setup
-    super
-    @access_token = stub("OmniAuth::Slack::OAuth2::AccessToken")
-    @access_token.stubs(:[])
-    @access_token.stubs(:params)
-    @access_token.stubs(:token)
-    @access_token.stubs(:to_hash).returns({})
-    @access_token.stubs(:user_id).returns(nil)
-    strategy.stubs(:access_token).returns(@access_token)
-    strategy.stubs(:has_scope?).returns true
-    strategy.stubs(:is_not_excluded?).returns true
-    strategy.stubs(:skip_info?).returns false
-  end
-  
-  # There should be 3 of these, one for each condition of the 'case' statement.
-  test "performs a GET to https://slack.com/api/users.identity" do
-    @access_token.expects(:get).with("/api/users.identity", {:headers => {"X-Slack-User" => nil}})
-      .returns(stub_everything("OAuth2::Response"))
-    strategy.send :identity
-  end
-end
-
+# This test is no longer relevant, but if modified, it might still be useful.
+#
 # class SkipInfoTest < StrategyTestCase
 # 
 #   test 'info should not include extended info when skip_info is specified' do
@@ -276,6 +280,9 @@ end
 
 
 
+# These tests are no longer relevant for the Strategy class,
+# but may be reworked for the classes they were moved to (if still exist).
+#
 # class SemaphoreTest < StrategyTestCase
 # 
 #   def setup
@@ -292,7 +299,7 @@ end
 #   end
 # 
 # end
-
+#
 # class ActiveMethodsTest < StrategyTestCase
 # 
 #   test 'with no settings, returns all defined api methods' do
