@@ -1,3 +1,5 @@
+# :markup: tomdoc
+
 require 'oauth2/access_token'
 require 'omniauth-slack/refinements'
 require 'omniauth-slack/data_methods'
@@ -8,18 +10,19 @@ module OmniAuth
     using StringRefinements
     
     module OAuth2
+      # Enhanced subclass of OAuth2::AccessToken, used by OmniAuth::Slack
+      # whenever an OAuth2::AccessToken is required.
+      #
+      # Adds class and instance scope-query method +has_scope?+, and adds
+      # basic API data methods and access methods.
       class AccessToken < ::OAuth2::AccessToken        
         include OmniAuth::Slack::DataMethods
         include OmniAuth::Slack::Debug
-                
-        # This is automatic if DataMethods are included.
-        #require 'omniauth-slack/semaphore'
-        #prepend Slack::Semaphore
-        
-        # Experimental:
-        # Needed to copy Strategy data-methods to access-token without any modification of data-methods.
+
+        # AccessToken instance (self), so Strategy data-methods can be copied to AccessToken without modification.
         def access_token; self; end
 
+        # Creates simple getter methods to pull specific data from params.
         %w(user_name user_email team_id team_name team_domain).each do |word|
           obj, atrb = word.split('_')
           define_method(word) do
@@ -28,17 +31,21 @@ module OmniAuth
           end
         end
 
+        # Cannonical AccessToken user_id.
         def user_id
           params['user_id'] ||
           params['user'].to_h['id'] ||
           params['authorizing_user'].to_h['user_id']
         end
         
+        # Cannonical AccessToken unique user-team-id combo.
         def uid
           "#{user_id}-#{team_id}"
         end
       
         # Is this a workspace app token?
+        #
+        # Returns nil if unknown
         def is_app_token?
           case
             when params['token_type'] == 'app' || token.to_s[/^xoxa/]
@@ -56,7 +63,13 @@ module OmniAuth
           params['user'].to_h['id']) && true || false
         end
       
-        # Parsed identity scopes (workspace apps only).
+        # Identity scopes (workspace apps only).
+        # Given _user_id, returns specific identity scopes.
+        #
+        # Sets @apps_permissions_users_list with parsed API response.
+        #
+        # _user_id  - String of Slack user ID.
+        #
         def apps_permissions_users_list(_user_id=nil)
           #raise StandardError, "APUL caller #{caller_method_name} user #{_user_id}"
           return {} unless is_app_token?
@@ -70,6 +83,7 @@ module OmniAuth
         end
         
         # Hash of current scopes for this token (workspace apps only).
+        # Sets +@apps_permissions_scopes_list+ with parsed API response.
         def apps_permissions_scopes_list
           return {} unless is_app_token?
             semaphore.synchronize {
@@ -80,8 +94,18 @@ module OmniAuth
           }
         end
                 
-        # Get all scopes, including apps.permissions.users.list if user_id.
-        # This now puts all compiled scopes back into params['scopes']
+        # Compiles scopes awarded to this AccessToken.
+        # Given _user_id, includes +apps.permissions.users.list+.
+        #
+        # Sets +@all_scopes+ with parsed API response.
+        #
+        # This now puts all compiled scopes back into <tt>params['scopes']</tt>.
+        # 
+        # _user_id  - String of Slack user ID.
+        #
+        # Returns Hash of scope Arrays where *key* is scope section
+        # and *value* is Array of scopes.
+        #
         def all_scopes(_user_id=nil)
           debug{"_user_id: #{_user_id}, @all_scopes: #{@all_scopes}"}
           if _user_id && !@all_scopes.to_h.has_key?('identity') || @all_scopes.nil?
@@ -102,23 +126,34 @@ module OmniAuth
             @all_scopes
           end
         end
-      
-        # TODO: Update this documentation to fit new has_scope method below.
-        # AccessToken instance has_scope?
-        # Determine if given scopes exist on the current access token.
-        # This is classic and workspace token compatible.
-        # TODO: does this accept all slack token types? What about bot tokens? Others?
-        # scope_query is a hash where:
-        #   key == scope type <app_home|team|channel|group|mpim|im|identity|classic>
-        #   val == array or string of individual scopes.
-        #   opts ==
-        #     user_id
-        #     base_scopes
-        #     logic
-        # If scope_query is a string, it will be interpreted as {classic: scope_query}
+        
+        # Match a given set of scopes against this token's awarded scopes,
+        # classic and workspace token compatible.
         #
-        # NOTE: # The keyword keys need to be symbols, therefore any
-        # hash passed in needs to have symbolized keys!
+        # If the scope-query is a string, it will be interpreted as a Slack Classic App
+        # scope string +{classic: scope-query-string}+.
+        #
+        # The keywords need to be symbols, so any hash passed as an argument
+        # (or as the entire set of args) should have symbolized keys!
+        #
+        # freeform_array    - [*Array, nil] default: [], array of scope query hashes
+        #
+        # :query            - [Hash, Array, nil] default: nil, a single scope-query Hash (or Array of Hashes)
+        #
+        # :logic            - [String, Symbol] default: 'or' [:or | :and] logic for the scope-query.
+        #                     Applies to a single query hash.
+        #                     The reverse logic is applied to an array of query hashes.
+        #
+        # :user             - [String] (nil) default: nil, user_id of the Slack user to query against
+        #                     leave blank for non-user queries
+        #
+        # :base             - [Hash] default: nil, a set of scopes to query against
+        #                     defaults to the awarded scopes on this token
+        #
+        # freeform_hash     - [**Hash] default: {}, interpreted as single scope query hash
+        #
+        # TODO: Does this accept all slack token types? What about bot tokens? Others?
+        #
         def has_scope?(*freeform_array, query: nil, logic:'or', user:nil, base:nil, **freeform_hash)
           debug{{freeform_array:freeform_array, freeform_hash:freeform_hash, query:query, logic:logic, user:user, base:base}}
           #OmniAuth.logger.debug({freeform_array:freeform_array, freeform_hash:freeform_hash, query:query, logic:logic, user:user, base:base})
@@ -153,17 +188,34 @@ module OmniAuth
           self.class.has_scope?(scope_query:query, scope_base:base, logic:logic)
         end
         
-                
-        # Class-level has_scope? with no token or state dependencies.
-        # Match the given scope_query against the given scope_base, with the given logic.
+        # Matches the given scope_query against the given scope_base, with the given logic.
+        #
         # This is classic and workspace token compatible.
+        #
+        # keywords      - All arguments are keyword arguments:
+        #
+        # :scope_query  - [Hash, Array of hashes] default: {}.
+        #                 If scope_query is a string, it will be interpreted as +{classic: scope-query-string}+.
+        #
+        #                 key    - Symbol of scope type <app_home|team|channel|group|mpim|im|identity|classic>
+        #                 value  - Array or String of individual scopes
+        #
+        # :scope_base   - [Hash] defaul: {}, represents the set of scopes to query against.
+        #
+        # :logic        - [String, Symbol] default: or. One of <and|or>.
+        #                 Applies to a single query hash.
+        #                 The reverse logic is applied to an array of query hashes.
+        #
+        # Examples
+        #                 
+        #   has_scope?(scope_query: {channel: 'channels:read chat:write'})
+        #   has_scope?(scope_query: [{identity:'uers:read', channel:'chat:write'}, {app_home:'chat:write'}], logic:'and')
+        #   has_scope?(scope_query: 'identity:users identity:team identity:avatar')
+        #
         # TODO: Remove any code specific to Slack, like classic-vs-workspace handling.
-        # scope_query is a hash, or array of hashes, where:
-        #   key == scope type <app_home|team|channel|group|mpim|im|identity|classic>
-        #   val == array or string of individual scopes.
-        #   logic == 'and' or 'or' (default).
-        # If scope_query is a string, it will be interpreted as {classic: scope_query}
+        #
         # TODO: Can this be added to OAuth2::AccessToken as a generic has_scope? Would it work for other providers?
+        # It ~should~ work for other providers, according to oauth2 spec https://tools.ietf.org/html/rfc6749#section-3.3
         #
         def self.has_scope?(scope_query:{}, scope_base:{}, logic:'or')
           debug{"class-level-has_scope? scope_query '#{scope_query}' scope_base '#{scope_base}' logic '#{logic}'"}

@@ -8,67 +8,51 @@ module OmniAuth
   module Slack
     using ArrayRefinements
     using StringRefinements
-    #using ObjectRefinements
   
+    # Enhanced hash class based on Hashie.
+    # Includes the following feature additions
+    #
+    # * Merge initializer for creating new instances
+    # * Accessor methods (read & write) for each attribute
+    # * Query methods for each attribute
+    # * Indifferent access (method, symbol, string)
+    #
     class Hashy < Hashie::Hash
       include Hashie::Extensions::MergeInitializer
       #include Hashie::Extensions::MethodReader
       include Hashie::Extensions::MethodAccess
       include Hashie::Extensions::MethodQuery
-      # Note that this extensions will introduce procs into the hash, which won't serialize.
+      # Note that this extension will introduce procs into the hash, which won't serialize.
       include Hashie::Extensions::IndifferentAccess
-      # What about this one?
-      #include Hashie::Extensions::SymbolizeKeys
       
       def self.inherited(other)
         other.send :include, OmniAuth::Slack::Debug
       end
     end
-    
-    #class Mashy < Hashie::Mash
-    # TODO: Decide if we need Mashy, or if we can just use Hashy (or even Hash).
-    class Mashy < Hashy
-    end
 
-    # DataMethods: declarative method dependency management.
-    # 
-    # - Get the most data from the fewest API calls.
-    # - Assign data gateway priority for methods that can pull from multiple gateways.
-    # - Skip a descendant path traversal now, when you know the end point is going to be blocked/down.
+    # :markup: rdoc
     #
-    # Include DataMethods module in your OmniAuth::Strategy class
-    # to gain flexible method dependency management.
-    # Control which data_methods get called and in what priority
-    # with the provider block option 'dependencies':
+    # Declarative method dependency management.
     #
-    #   provider ...
-    #     dependencies 'my_api_method', 'another_api_method'
-    #   end
+    # Goals
     #
-    # Example data-method declaration in the Strategy class:
+    # * Get the most data from the fewest API calls.
+    # * Consider scopes required for each API call.
+    # * Define additional conditions to be met for each API call.
+    # * Assign data source priority for methods that can pull from multiple sources.
+    # * Skip descendant source traversal, when the end point is known to be blocked/down.
     #
-    # data_method :my_api_method do
-    #   scope classic:'identity.basic', identity:'identity:read:user'
-    #   scope team:'conversations:read', app_home:'chat:write'
-    #   scope_logic: 'or'  # override the default logic (or) within each scope query.
-    #   storage true  # override the name of the cache variable. default is method-name. false disables cache for this method.
-    #   condition proc{ true }
-    #   condition proc{ ! false }
-    #   default_value Hash.new
-    #   source :access_token do
-    #     get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
-    #   end
-    # end
+    # Include +DataMethods+ module in your +OmniAuth::Strategy+ class or in your
+    # +OAuth2::AccessToken+ class to gain flexible method dependency management.
+    # Control which data-methods get called and in what priority
+    # with the +OmniAuth::Builder+ block provider option +:dependencies+.
     #
-    # data_method :user_name do
-    #   source :my_api_method do
-    #     user.name
-    #   end
-    # end
-
+    #   provider :slack, KEY, SECRET, dependencies: (['my_api_method', 'another_api_method'])
+    #
     module DataMethods
       include OmniAuth::Slack::Debug
-          
+      
+      # Perform operations on the class that included DataMethods.
       def self.included(other)
         #OmniAuth.logger.debug "#{other} included #{self}"
         debug{"#{other} included #{self}"}
@@ -82,10 +66,17 @@ module OmniAuth
         end
       end
       
-      # Strategy instance dependencies.
+      # Strategy instance data-method dependencies.
+      # :markup: tomdoc
+      #
+      # If given a filter, returns a filtered master dependency list.
+      #
+      # Otherwise returns the user-defined dependency list, or the class-level
+      # dependency list with the user (or default) filter applied.
+      #
+      # filter  - Regexp matching desired data-method names (default: nil)
+      #
       def dependencies(filter=nil)
-        # If you provide a filter, this will return the master dependency list (filtered).
-        # Otherwise return the user-defined dependencies, or the class-level deps with the user (or default) filter applied.
         raw = if !filter.nil?
           self.class.dependencies(filter).keys
         else
@@ -199,9 +190,39 @@ module OmniAuth
     end # DataMethods
 
 
-
-    #####  DataMethod Class  #####
-
+    # A DataMethod instance holds the logic, scope, conditions, and sources
+    # of a defined data-method.
+    #
+    # When a data method is defined with the class method +data_method+,
+    # and passed a block, the block is evaluated in the context of the
+    # associated DataMethod instance.
+    #
+    # The instance methods of DataMethod are used to facilitate
+    # setting the attributes of the data-method.
+    #
+    # Example data-method definition in the Strategy class:
+    # 
+    #   data_method :my_api_method do
+    #     scope classic:'identity.basic', identity:'identity:read:user'
+    #     scope team:'conversations:read', app_home:'chat:write'
+    #     # override the default logic (or) within each scope query.
+    #     scope_logic 'or'
+    #     # override the name of the cache variable. default is method-name. false disables cache for this method.
+    #     storage true
+    #     condition proc{ true }
+    #     condition proc{ ! false }
+    #     default_value Hash.new
+    #     source :access_token do
+    #       get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed
+    #     end
+    #   end
+    #   
+    #   data_method :user_name do
+    #     source :my_api_method do
+    #       user.name
+    #     end
+    #   end
+    #
     class DataMethod < Hashy
 
       def self.new(*args)  #(name, klass, optional-default-proc, optional-opts, &optional-block)
@@ -280,7 +301,7 @@ module OmniAuth
       def source(*args) # (optional-name, optional-proc, optional-opts, &optional-block)
         #return self[__method__] unless args.any?
         return source_array unless args.any?
-        opts = args.last.is_a?(Hash) ? args.pop : Mashy.new
+        opts = args.last.is_a?(Hash) ? args.pop : Hashy.new
         source_name = args.shift if [String, Symbol].any?{|t| args[0].is_a?(t)}
         code = case
           when block_given?; Proc.new
@@ -292,17 +313,17 @@ module OmniAuth
         self[:source] ||= Hashie::Array.new
         #log :debug, "Declaring #{source_name}.source: #{name}, #{opts}, #{prc}"
         debug{"Declaring source :#{source_name} for #{name}: #{opts}, #{code}"}
-        source_hash = Mashy.new({name: source_name, code: code}.merge(opts))
+        source_hash = Hashy.new({name: source_name, code: code}.merge(opts))
         self[:source] << source_hash
       end
       
       def source_array
         Hashie::Array.new.concat( [self[:source]].flatten(1).compact.map do |v|
           case v
-          when Hash; Mashy.new(v)
-          when String; Mashy.new(name: 'default', code: proc{eval(v)})
-          when Proc; Mashy.new(name: 'default', code: v)
-          else Mashy.new(name: 'unknown', code: v)
+          when Hash; Hashy.new(v)
+          when String; Hashy.new(name: 'default', code: proc{eval(v)})
+          when Proc; Hashy.new(name: 'default', code: v)
+          else Hashy.new(name: 'unknown', code: v)
           end
         end)
       end
@@ -473,11 +494,17 @@ module OmniAuth
       
       # Wrap this around a block to cache result as ivar @<name-of-method>.
       def with_cache(strategy, &block)
-        storage_name = storage || name
-        ivar_data = strategy.instance_variable_get("@#{storage_name}")
-        return ivar_data if ivar_data
+        storage_name = case storage
+          when false; false
+          when nil; name
+          when storage; storage
+        end
+        if storage_name
+          ivar_data = strategy.instance_variable_get("@#{storage_name}")
+          return ivar_data if ivar_data
+        end
         result = yield
-        strategy.instance_variable_set("@#{storage_name}", result) if result && storage_name && storage != false
+        strategy.instance_variable_set("@#{storage_name}", result) if result && storage_name
         result
       end
       
