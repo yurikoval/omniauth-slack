@@ -17,24 +17,50 @@ module OmniAuth
       class AuthHash < OmniAuth::Slack::AuthHash;
       end
     
+      debug{"#{self} setting up default options"}
+      
+      # Master list of authorization options handled by omniauth-slack.
       AUTH_OPTIONS = %w(redirect_uri scope team team_domain )
       
+      # Default strategy name.
       option :name, 'slack'
+      
+      # Options that can be passed with provider authorization URL.
       option :authorize_options, AUTH_OPTIONS - %w(team_domain)
+      
+      # Options allowed to pass from omnauth /auth/<provider> URL to
+      # actual provider authorization URL.
       option :pass_through_params, ['team']
-      # TODO: Should these be in DataMethods module?
+      
+      # TODO: Should this be in DataMethods module?
+      #       Maybe, since you almost always want a default of 0
+      #       and since the method is defined in DataMethods.
       option :preload_data_with_threads, 0
+      
+      # Define additional data-methods to be called upon
+      # successful authorization.
       option :additional_data
-      # TODO: Should these be in DataMethods module?
+      
+      # Describes which data-methods are gated, or in other words,
+      # which data-methods are controlled by the :dependencies option.
+      # 
+      # This is generally not a setting that the user should be changing.
+      # The user should adjust the :dependencies option instead.
       option :dependency_filter, /^api_/
+      
+      # Describes which data-methods are called and in what order.
+      # Gated data-methods that are ommitted from this list (by the user)
+      # will not be called.
       option :dependencies
 
+      # OAuth2::Client options.
       option :client_options, {
         site: 'https://slack.com',
         token_url: '/api/oauth.access',
         auth_scheme: :basic_auth
       }
       
+      # Authorization token-exchange API call options.
       option :auth_token_params, {
         mode: :query,
         param_name: 'token'
@@ -45,6 +71,7 @@ module OmniAuth
       # to be globally unique.
       uid { "#{user_id}-#{team_id}" }
 
+      # Gathers access_token and awarded scopes.
       credentials do
         {
           token_type: access_token['token_type'],
@@ -53,6 +80,7 @@ module OmniAuth
         }
       end
 
+      # Gathers a myriad of possible data returned from omniauth-slack /api/oauth.access call.
       info do        
         num_threads, method_names = options.preload_data_with_threads
         if num_threads.to_i > 0
@@ -74,6 +102,7 @@ module OmniAuth
         )
 
         # Disabled to manually define info.
+        # TODO: This might be obsoldete now?
         #apply_data_methods(hash)
 
         # Now add everything else, using further calls to the api, if necessary.
@@ -93,6 +122,7 @@ module OmniAuth
         hash
       end # info
 
+      # Gather additiona API calls, user-defined additional_data method responses, and raw Slack API responses.
       extra do
         {
           # scopes_requested: (env['omniauth.params'] && env['omniauth.params']['scope']) || \
@@ -124,7 +154,7 @@ module OmniAuth
       end
 
       
-      # Pass on certain authorize_params to the Slack authorization GET request.
+      # Passes-on certain authorize_params to the Slack authorization GET request.
       # See https://github.com/omniauth/omniauth/issues/390
       def authorize_params
         super.tap do |prms|
@@ -136,7 +166,7 @@ module OmniAuth
         end
       end
       
-      # Get and decode options[:pass_through_params]. 
+      # Gets and decodes :pass_through_params option.
       def pass_through_params
         ptp = [options.pass_through_params].flatten.compact
         case
