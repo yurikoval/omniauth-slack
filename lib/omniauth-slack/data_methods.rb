@@ -54,7 +54,6 @@ module OmniAuth
       
       # Perform operations on the class that included DataMethods.
       def self.included(other)
-        #OmniAuth.logger.debug "#{other} included #{self}"
         debug{"#{other} included #{self}"}
         other.instance_eval do
           prepend Semaphore
@@ -69,12 +68,19 @@ module OmniAuth
       # Strategy instance data-method dependencies.
       # :markup: tomdoc
       #
-      # If given a filter, returns a filtered master dependency list.
+      # The methods listed here will be called, in listed order,
+      # when resolving the source of any given data-method.
+      # 
+      # Data-methods not listed here will not be called,
+      # UNLESS they are also omitted from the master dependency
+      # list using the dependency_filter regexp.
+      #
+      # If given a regexp, returns a filtered master dependency list.
       #
       # Otherwise returns the user-defined dependency list, or the class-level
       # dependency list with the user (or default) filter applied.
       #
-      # filter  - Regexp matching desired data-method names (default: nil)
+      # filter  - Regexp matching the names of data-methods to control (default: nil)
       #
       def dependencies(filter=nil)
         raw = if !filter.nil?
@@ -90,6 +96,19 @@ module OmniAuth
         end
       end
       
+      # Filters the master data-method dependency list.
+      # Data-methods matched by the dependency_filter will be
+      # controlled by the gating logic of scope, conditions,
+      # and order-listed in :dependencies.
+      #
+      # This is intended to be set per provider-strategy (per gem),
+      # and should generally never be used by the user/developer
+      # consuming the gem.
+      #
+      # A sane default is generally something that matches all API method calls.
+      # 
+      #   provider :oauth2_provider, KEY, SECRET, dependency_filter:/^api_/
+      #
       def dependency_filter
         (options.dependency_filter if options.respond_to?(:dependency_filter)) || @dependency_filter
       end
