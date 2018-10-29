@@ -28,8 +28,8 @@ module OmniAuth
       # Options that can be passed with provider authorization URL.
       option :authorize_options, AUTH_OPTIONS - %w(team_domain)
       
-      # Options allowed to pass from omnauth /auth/<provider> URL to
-      # actual provider authorization URL.
+      # Options allowed to pass from omniauth /auth/<provider> URL
+      # to provider authorization URL.
       option :pass_through_params, ['team']
       
       # TODO: Should this be in DataMethods module?
@@ -37,12 +37,12 @@ module OmniAuth
       #       and since the method is defined in DataMethods.
       option :preload_data_with_threads, 0
       
-      # Define additional data-methods to be called upon
+      # Define additional data-methods to be called on
       # successful authorization.
       option :additional_data
       
-      # Describes which data-methods are gated, or in other words,
-      # which data-methods are controlled by the :dependencies option.
+      # Describes which data-methods are gated. Only these data-methods
+      # can be controlled by the :dependencies option.
       # 
       # This is generally not a setting that the user should be changing.
       # The user should adjust the :dependencies option instead.
@@ -105,7 +105,7 @@ module OmniAuth
         # TODO: This might be obsoldete now?
         #apply_data_methods(hash)
 
-        # Now add everything else, using further calls to the api, if necessary.
+        # Adds data from api_users_info and/or api_users_profile, if allowed by scope and other settings.
         unless skip_info?
           %w(first_name last_name phone skype avatar_hash real_name real_name_normalized).each do |key|
             hash[key.to_sym] = (
@@ -122,7 +122,7 @@ module OmniAuth
         hash
       end # info
 
-      # Gather additiona API calls, user-defined additional_data method responses, and raw Slack API responses.
+      # Gathers additiona API calls, user-defined additional_data method responses, and raw Slack API responses.
       extra do
         {
           # scopes_requested: (env['omniauth.params'] && env['omniauth.params']['scope']) || \
@@ -141,7 +141,8 @@ module OmniAuth
         }
       end
       
-
+      # Adds user-defined additional_data methods to this
+      # class and to OmniAuth::Slack::AccessToken class.
       def self.define_additional_data(definitions={})
         return if @additional_data_defined
         if !definitions.to_h.empty?
@@ -153,8 +154,9 @@ module OmniAuth
         end
       end
 
-      
-      # Passes-on certain authorize_params to the Slack authorization GET request.
+
+      # Overrides OmniAuth::Oauth2#authorize_params so that
+      # specified params can be passed on to Slack authorization GET request.
       # See https://github.com/omniauth/omniauth/issues/390
       def authorize_params
         super.tap do |prms|
@@ -166,19 +168,8 @@ module OmniAuth
         end
       end
       
-      # Gets and decodes :pass_through_params option.
-      def pass_through_params
-        ptp = [options.pass_through_params].flatten.compact
-        case
-          when ptp[0].to_s == 'all'
-            options.pass_through_params = AUTH_OPTIONS
-          when ptp[0].to_s == 'none'
-            []
-          else
-            ptp
-        end
-      end
-      
+      # Overrides OmniAuth callback phase to extract session var
+      # for omniauth.authorize_params into env (this is how omniauth does this).
       def callback_phase #(*args)
         # This technique copied from OmniAuth::Strategy (this is how they do it for the other omniauth objects).
         env['omniauth.authorize_params'] = session.delete('omniauth.authorize_params')
@@ -189,12 +180,13 @@ module OmniAuth
         result = super
       end
       
-      # Get a new OAuth2::Client and define custom behavior.
-      # * overrides previous omniauth-strategies-oauth2 :client definition.
+      # Overrides OmniAuth::Strategies::OAuth2#client to define custom behavior.
       #
-      # * Log API requests with OmniAuth.logger
-      # * Add API responses to @raw_info hash
-      # * Set auth site uri with custom subdomain (if provided).
+      # * Logs API requests with OmniAuth.logger.
+      # * Adds API responses to @raw_info hash.
+      # * Sets auth site uri with custom subdomain (if provided).
+      #
+      # Returns instance of custom OmniAuth::Slack::OAuth2::Client.
       #
       def client
         #new_client = super
@@ -214,7 +206,7 @@ module OmniAuth
         new_client
       end
       
-      # Dropping query_string from callback_url prevents some errors in call to /api/oauth.access.
+      # Drops query_string from callback_url to prevent some errors in call to /api/oauth.access.
       def callback_url
         full_host + script_name + callback_path
       end
@@ -222,7 +214,20 @@ module OmniAuth
       
       private
       
-      # Run/call/compile results from additional_data definitions.
+      # Gets and decodes :pass_through_params option.
+      def pass_through_params
+        ptp = [options.pass_through_params].flatten.compact
+        case
+          when ptp[0].to_s == 'all'
+            options.pass_through_params = AUTH_OPTIONS
+          when ptp[0].to_s == 'none'
+            []
+          else
+            ptp
+        end
+      end
+      
+      # Runs/calls/compiles results from additional_data definitions.
       def get_additional_data
         if false && skip_info?
           {}
@@ -252,7 +257,7 @@ module OmniAuth
 
       # The data_method class method takes a name, hash, and/or block.
       # The block is evaluated in the context of the new DataMethod instance.
-      # Use the DSL methods within the block to contruct the DataMethod instance.
+      # Use the DSL methods within the block to construct the DataMethod instance.
       # See data_methods.rb for available DSL methods.
                     
       data_method :user_name, info_key: 'name', storage: :user_name, source: [

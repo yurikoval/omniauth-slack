@@ -129,7 +129,7 @@ module OmniAuth
         end
       end
       
-      # Preload api calls with a pool of threads.
+      # Preloads api calls with a pool of threads.
       def preload_data_with_threads(num_threads=1, method_names=dependencies)
         return unless num_threads > 0 && !@preloaded_data
         @preloaded_data = 1
@@ -158,9 +158,11 @@ module OmniAuth
       end
       
 
+      # Methods to be extended onto the class that included DataMethods.
+      # See #self.included above.
       module Extensions
 
-        # List DataMethod instances and their dependencies.
+        # Lists all defined DataMethod instances and their dependencies.
         def dependency_tree
           return {} unless data_methods.to_h.any?
           data_methods.inject({}){|h,a| k,v = a[0], a[1]; h[k] = v.dependency_hash; h}
@@ -180,12 +182,12 @@ module OmniAuth
           both.inject({}){|h, v| h[v] = deps.count(v.to_s); h}.select{|k,v| k[filter]}
         end  
         
-        # Which dependencies are missing callable methods.
+        # Lists dependencies that are missing callable methods.
         def missing_dependencies
           dependencies.keys.select{|m| !method_defined?(m) && !private_method_defined?(m)}
         end
         
-        # Build a DataMethod object from a hash or a block.
+        # Builds a DataMethod object from a hash or a block.
         #def data_method(name, opts = Hashy.new)
         def data_method(*args) # (name, optional-default-val, optional-opts, &optional-block)
           #logger.debug "(slack) Building data_method object (#{name}, #{opts})"

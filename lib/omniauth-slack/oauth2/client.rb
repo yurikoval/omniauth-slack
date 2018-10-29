@@ -19,14 +19,15 @@ module OmniAuth
           self.history = {}
         end
                 
-        # Override the OAuth2::Client#get_token to pass in the omniauth-slack AccessToken.
+        # Overrides OAuth2::Client#get_token to pass in the omniauth-slack AccessToken.
         def get_token(params, access_token_opts = {}, access_token_class = OmniAuth::Slack::OAuth2::AccessToken) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
           rslt = super(params, access_token_opts, access_token_class)
           debug{"Client #{self} using AccessToken #{rslt}"}
           rslt
         end
         
-        # Log each request and store the result in @history hash.
+        # Logs each API request and stores the API result in @history hash.
+        # TODO: There should be some kind of option to disable this.
         def request(*args)
           logger.debug "(slack) API request '#{args[0..1]}'."  # in thread '#{Thread.current.object_id}'."  # by Client '#{self}'
           request_output = super(*args)
@@ -36,7 +37,7 @@ module OmniAuth
           request_output
         end
 
-        # Use custom subdomain for oauth.access calls.
+        # Overrides #site to insert custom subdomain for API calls.
         def site(*args)
           if !@subdomain.to_s.empty?
             site_uri = URI.parse(super)
