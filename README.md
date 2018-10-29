@@ -12,11 +12,11 @@ To view current or previous releases:
 # OmniAuth::Slack
 
 This Gem contains the Slack OAuth2 strategy for OmniAuth and supports most features of
-the [Slack OAuth2 authorization API](https://api.slack.com/docs/oauth), including both the
+the [Slack OAuth2 authorization API](https://api.slack.com/docs/oauth), including the
 [Sign in with Slack](https://api.slack.com/docs/sign-in-with-slack) and
 [Add to Slack](https://api.slack.com/docs/slack-button) approval flows.
 
-This Gem supports Slack "classic" apps and tokens as well as the developer preview of [Workspace apps and tokens](https://api.slack.com/workspace-apps-preview).
+This Gem supports Slack "classic" apps and tokens as well as [Workspace apps and tokens](https://api.slack.com/workspace-apps-preview).
 
 
 ## Before You Begin
@@ -326,7 +326,7 @@ To allow all pass-through options.
 
 
 ## Slack Workspace Apps
-This gem provides support for Slack's developer preview of [Workspace apps](https://api.slack.com/workspace-apps-preview). There are some important differences between Slack's classic apps and the new Workspace apps. The main points to be aware of when using omniauth-slack with Workspace Apps are:
+This gem provides support for Slack [Workspace apps](https://api.slack.com/workspace-apps-preview). There are some important differences between Slack's classic apps and the new Workspace apps. The main points to be aware of when using omniauth-slack with Workspace Apps are:
 
 * Workspace app tokens are issued as a single token per team. There are no user or bot tokens. All Workspace app API calls are made with the Workspace token. Calls that act on behalf of a user or bot are made with the same token.
 
