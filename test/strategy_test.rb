@@ -248,22 +248,22 @@ end
 class PassThroughParamsTest < StrategyTestCase
   test 'returns all AUTH_OPTIONS when given :all' do
     strategy.options.pass_through_params = :all
-    assert_equal strategy.class::AUTH_OPTIONS, strategy.pass_through_params
+    assert_equal strategy.class::AUTH_OPTIONS, strategy.send(:pass_through_params)
   end
   
   test 'returns empty array when given :none' do
     strategy.options.pass_through_params = :none
-    assert_equal [], strategy.pass_through_params
+    assert_equal [], strategy.send(:pass_through_params)
   end
   
   test "returns empty array when given nil" do
     strategy.options.pass_through_params = nil
-    assert_equal [], strategy.pass_through_params
+    assert_equal [], strategy.send(:pass_through_params)
   end
   
   test "returns specific items when given specific items" do
     strategy.options.pass_through_params = %w(scope team_domain)
-    assert_equal %w(scope team_domain), strategy.pass_through_params
+    assert_equal %w(scope team_domain), strategy.send(:pass_through_params)
   end
 end
 
