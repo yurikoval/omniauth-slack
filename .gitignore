@@ -1,3 +1,4 @@
+.DS_Store
 *.gem
 *.rbc
 .bundle
@@ -6,17 +7,16 @@
 Gemfile.lock
 InstalledFiles
 _yardoc
-coverage
+coverage/
 doc/
-lib/bundler/man
-pkg
 rdoc/
 ydoc/
+lib/bundler/man
+pkg/
 spec/reports
-test/tmp
-test/version_tmp
 tmp
 .idea/
 .ruby-version
 .ruby-gemset
 .gitchangelog.rc
+empty*

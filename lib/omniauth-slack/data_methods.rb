@@ -8,6 +8,8 @@ module OmniAuth
   module Slack
     using ArrayRefinements
     using StringRefinements
+    
+    # TODO: Add +Returns+ to comment blocks for methods.
   
     # Enhanced hash class based on Hashie.
     # Includes the following feature additions
@@ -30,8 +32,6 @@ module OmniAuth
       end
     end
 
-    # :markup: rdoc
-    #
     # Declarative method dependency management.
     #
     # Goals
@@ -64,6 +64,7 @@ module OmniAuth
           @data_methods ||= Hashy.new
         end
       end
+
       
       # Strategy instance data-method dependencies.
       # :markup: tomdoc
@@ -113,10 +114,11 @@ module OmniAuth
         (options.dependency_filter if options.respond_to?(:dependency_filter)) || @dependency_filter
       end
       
+      # Points to +self.class.data_methods+.
       def data_methods; self.class.data_methods; end
       
-      # TODO: Consider getting rid of this, or at least not using it for built-in omniauth-slack 'info' keys/values.
-      #       But keep it around for user-defined data methods that should be attached to the info hash.
+      # Adds result of each method to +info+ hash, keyed by +:info_key+.
+      # TODO: Rework this method to run for only for methods with a defined +:info_key+.
       def apply_data_methods(rslt = Hashy.new)
         data_methods.each do |name, opts|
           key = opts[:info_key]
@@ -170,7 +172,9 @@ module OmniAuth
 
         # Strategy class dependencies.
         # Flattens compiled dependency_tree into an array of uniq strings.
-        # TODO: I think this can be cleaned up.
+        #
+        # TODO: I think this can be cleaned up & simplified.
+        #
         def dependencies(filter = nil)
           filter ||= /.*/
           dtree = dependency_tree
@@ -187,8 +191,10 @@ module OmniAuth
           dependencies.keys.select{|m| !method_defined?(m) && !private_method_defined?(m)}
         end
         
-        # Builds a DataMethod object from a hash or a block.
-        #def data_method(name, opts = Hashy.new)
+        # Defines a DataMethod object.
+        #
+        # TODO: Should the bulk of this method be combined with DataMethod#new ?
+        #
         def data_method(*args) # (name, optional-default-val, optional-opts, &optional-block)
           #logger.debug "(slack) Building data_method object (#{name}, #{opts})"
           
@@ -196,7 +202,7 @@ module OmniAuth
           name = args.shift
           default_val  = args.shift
           blk = Proc.new if block_given?
-          debug{"Building data_method object (#{name}, #{opts})"}
+          debug{"Defining data_method object (#{name}, #{opts})"}
           
           data_methods[name] = DataMethod.new(name, self, default_val, opts, &blk)
                     
@@ -246,6 +252,20 @@ module OmniAuth
     #
     class DataMethod < Hashy
 
+      # Creates a new instance of DataMethod
+      # :markup: tomdoc
+      #
+      # This should be called by +DataMethods.data_method+ macro,
+      # and is generally not intended for userspace.
+      # 
+      # name               - Name of data-method as String or Symbol.
+      # klass              - Class that data-method is defined under.
+      # default_proc       - A Proc that evaluates to the default value, default: nil.
+      # options_hash       - Hash of options, default: nil.
+      # block              - Block containing class methods describing data-method options, default: nil.
+      #
+      # TODO: What data types do these args accept?
+      #
       def self.new(*args)  #(name, klass, optional-default-proc, optional-opts, &optional-block)
         debug{"DataMethod.new with args: #{args}"}
         opts = Hashy.new(args.last.is_a?(Hash) ? args.pop : {})
@@ -269,7 +289,7 @@ module OmniAuth
         instance_eval(&Proc.new) if block_given?
       end
       
-      # Override instance debug to insert local :klass as Class,
+      # Overrides instance debug to insert local :klass as Class,
       # instead of default, which would be DataMethod.
       def debug(method_name=nil, _klass=klass, &block)
         #puts caller_method_name
@@ -281,21 +301,8 @@ module OmniAuth
         klass.logger.send(type, "(#{klass.name.split('::').last.downcase} data_method) #{text}") if klass.respond_to?(:logger)
       end
       
-      # Get/set scope queries.
-      # Expects same args as AccessToken#has_scope?
-      #   query == hash or array of hashes
-      #   opts (options) == hash of options
-      # def scope(*args)
-      #   return self[__method__] unless args.any?
-      #   self[:scope] ||= []
-      #   #log :debug, "Declaring #{name}.scope: #{args}"
-      #   debug{"Declaring #{name}.scope: #{args}"}
-      #   query = args.shift
-      #   opts = args.last
-      #   self[:scope_opts] = opts if opts
-      #   self[:scope] << query
-      #   self[:scope].flatten!
-      # end
+      # Gets/sets scope queries.
+      # Expects same args as OmniAuth::Slack::OAuth2::AccessToken#has_scope?
       def scope(*args)
         #return self[__method__] unless (args.any?)
         raw_scope = self[__method__]
@@ -310,15 +317,14 @@ module OmniAuth
         self[:scope] = args #.flatten.compact
       end
       
-      # # Get/set scope_opts (:and | :or).
-      # def scope_opts(opts={})
-      #   return self[__method__] unless opts && opts.any?
-      #   #log :debug, "Declaring #{name}.scope_opts: #{opts}"
-      #   debug{"Declaring #{name}.scope_opts: #{opts}"}
-      #   self[:scope_opts] = opts
-      # end
-      
-      # Get/set sources.
+      # Gets/sets a source for this DataMethod.
+      # :markup: tomdoc
+      #
+      # name   - Method or variable name to resolve.
+      # proc   - Proc to execute in context of :name.
+      # opts   - Hash or source options.
+      # block  - Block of code to execute in context of :name.
+      #
       def source(*args) # (optional-name, optional-proc, optional-opts, &optional-block)
         #return self[__method__] unless args.any?
         return source_array unless args.any?
@@ -338,6 +344,7 @@ module OmniAuth
         self[:source] << source_hash
       end
       
+      # Gets array of defined sources.
       def source_array
         Hashie::Array.new.concat( [self[:source]].flatten(1).compact.map do |v|
           case v
@@ -348,8 +355,12 @@ module OmniAuth
           end
         end)
       end
+      private :source_array
       
-      # Get/set cache storage name (or disable with false).
+      # Gets/sets cache storage name (or disable with false).
+      #
+      # TODO: Change name of this method to :cache_name or :cache_as.
+      #
       def storage(arg = nil)
         return self[__method__] unless arg
         #log :debug, "Declaring #{name}.cache_storage: #{arg}"
@@ -357,7 +368,7 @@ module OmniAuth
         self[:storage] = arg
       end
       
-      # Get/set conditions.
+      # Gets/sets additional conditions for gating this method.
       def condition(code = nil)
         code = block_given? ? Proc.new : code
         return self[__method__] unless code
@@ -367,7 +378,11 @@ module OmniAuth
         self[:condition] << code
       end
       
-      # Get/set defaut_value.
+      # Gets/sets defaut_value.
+      #
+      # TODO: Possibly remove the :default_value variable, while
+      # making this method define a :default source.
+      #
       def default_value(arg = nil)
         return self[__method__] unless arg
         #log :debug, "Declaring #{name}.default_value: #{arg}"
@@ -375,8 +390,12 @@ module OmniAuth
         self[:default_value] = arg
       end
 
-      # Dependencies for this DataMethod instance.
-      # For example try this: Strategy.data_methods.each{|k,v| puts "#{k}: #{v.api_dependencies_array(Strategy).inspect}" };nil
+      # Compiles dependencies for this DataMethod instance.
+      # 
+      # Example:
+      #
+      #   Strategy.data_methods.each{|k,v| puts "#{k}: #{v.api_dependencies_array(Strategy).inspect}" };nil
+      #
       def dependency_array
         return [] unless sources = source
         sources.inject([]) do |ary,src|
@@ -387,9 +406,14 @@ module OmniAuth
         end
       end
       
-      # Dependency tree for this DataMethod instance.
-      # For example try this: Strategy.data_methods.each{|k,v| puts "#{k}: #{v.api_dependencies_hash(Strategy).inspect}" };nil
-      # or try this: y Strategy.data_methods.inject({}){|h,a| k,v = a[0], a[1]; h[k] = v.api_dependencies_hash(Strategy); h}
+      # Compiles dependency tree for this DataMethod instance.
+      #
+      # Examples:
+      #
+      #   Strategy.data_methods.each{|k,v| puts "#{k}: #{v.api_dependencies_hash(Strategy).inspect}" };nil
+      #
+      #   y Strategy.data_methods.inject({}){|h,a| k,v = a[0], a[1]; h[k] = v.api_dependencies_hash(Strategy); h}
+      #
       def dependency_hash
         return {} unless sources = source
         sources.inject({}) do |hsh,src|
@@ -401,7 +425,7 @@ module OmniAuth
         end   
       end
       
-      # Resolve all conditions and return true/false.
+      # Resolves all conditions and returns true or false.
       def resolve_conditions(strategy, conditions = condition)
         #log :debug, "Resolve_conditions for data-method '#{name}' with conditions '#{conditions}'"
         debug{"Resolve_conditions for data-method '#{name}' with conditions '#{conditions}'"}
@@ -423,7 +447,7 @@ module OmniAuth
         rslt
       end
       
-      # Resolve all scope queries and return true/false.
+      # Resolves all scope queries and returns true or false.
       def resolve_scope(strategy)
         scopes = scope
         case scopes
@@ -439,7 +463,7 @@ module OmniAuth
         end
       end
       
-      # Resolve a single source-hash.
+      # Resolves a single source definition.
       def resolve_source(src, strategy)
         source_target = src.respond_to?(:name) ? src.name : strategy
         source_code = case
@@ -482,7 +506,8 @@ module OmniAuth
           end
         end
       end
-        
+      
+      # Resolves the default-value, if defined, or returns nil.
       def resolve_default_value(strategy)
         dval = default_value
         case dval
@@ -499,7 +524,7 @@ module OmniAuth
         end
       end
       
-      # Select valid accessible source to attempt.
+      # Selects valid accessible sources to attempt resolution on.
       def select_sources(strategy)
         sources = source
         strategy.instance_eval do
@@ -513,7 +538,7 @@ module OmniAuth
         end
       end
       
-      # Wrap this around a block to cache result as ivar @<name-of-method>.
+      # Wraps a memoization-with-ivar around a given block.
       def with_cache(strategy, &block)
         storage_name = case storage
           when false; false
@@ -529,7 +554,7 @@ module OmniAuth
         result
       end
       
-      # Call the entire data-method.
+      # Processes this DataMethod in the context of the given Strategy instance.
       def call(strategy)
         with_cache(strategy) do
           result = nil
