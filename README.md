@@ -33,13 +33,13 @@ While you're in the application settings, add a Redirect URL to your application
 First start by adding this gem to your Gemfile:
 
 ```ruby
-gem 'ginjo-omniauth-slack'
+gem 'ginjo-omniauth-slack', require:'omniauth-slack'
 ```
 
 Or specify the latest HEAD version from the ginjo repository:
 
 ```ruby
-gem 'ginjo-omniauth-slack', git: 'https://github.com/ginjo/omniauth-slack'
+gem 'ginjo-omniauth-slack', require:'omniauth-slack', git: 'https://github.com/ginjo/omniauth-slack'
 ```
 
 Next, tell OmniAuth about this provider.
