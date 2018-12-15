@@ -1,0 +1,7 @@
+--output ydoc
+--plugin tomdoc
+--no-cache
+--exclude vendor\/.*
+#lib/**/*.rb
+#lib/**/*.erb
+
