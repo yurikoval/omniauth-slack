@@ -20,7 +20,7 @@ module OmniAuth
       debug{"#{self} setting up default options"}
       
       # Master list of authorization options handled by omniauth-slack.
-      AUTH_OPTIONS = %w(redirect_uri scope team team_domain )
+      AUTH_OPTIONS = %w(redirect_uri scope user_scope team team_domain )
       
       # Default strategy name.
       option :name, 'slack'
@@ -55,8 +55,10 @@ module OmniAuth
 
       # OAuth2::Client options.
       option :client_options, {
+        flow_version: 'v2',
         site: 'https://slack.com',
-        token_url: '/api/oauth.access',
+        authorize_url: proc{"/oauth/#{@options[:flow_version]=='v2' ? 'v2/' : ''}authorize"},
+        token_url: proc{"/api/oauth.#{@options[:flow_version]=='v2' ? 'v2.' : ''}access"},
         auth_scheme: :basic_auth
       }
       
@@ -205,8 +207,8 @@ module OmniAuth
         
         new_client
       end
-      
-      # Drops query_string from callback_url to prevent some errors in call to /api/oauth.access.
+
+      # Dropping query_string from callback_url prevents some errors in call to /api/oauth.[v2.]access.
       def callback_url
         full_host + script_name + callback_path
       end
@@ -247,6 +249,11 @@ module OmniAuth
       def team_id
         # access_token['team_id'] || access_token['team'].to_h['id']
         access_token.team_id
+      end
+      
+      # Parsed data returned from /slack/oauth.[v2.]access api call.
+      def auth
+        @auth ||= access_token.params.to_h.merge({'token' => access_token.token})
       end
 
       def web_hook_info

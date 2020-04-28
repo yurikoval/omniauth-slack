@@ -18,11 +18,15 @@ class ClientTest < StrategyTestCase
   end
 
   test "has correct authorize url" do
-    assert_equal "/oauth/authorize", strategy.client.options[:authorize_url]
+    assert_equal "/oauth/v2/authorize", strategy.client.instance_eval{
+      options[:authorize_url].is_a?(Proc) ? instance_eval(&options[:authorize_url]) : options[:authorize_url]
+    }
   end
 
   test "has correct token url" do
-    assert_equal "/api/oauth.access", strategy.client.options[:token_url]
+    assert_equal "/api/oauth.v2.access", strategy.client.instance_eval{
+      options[:token_url].is_a?(Proc) ? instance_eval(&options[:token_url]) : options[:token_url]
+    }
   end
 
   test "has correct auth_scheme" do

@@ -14,6 +14,7 @@ module OmniAuth
         attr_accessor :logger, :history, :subdomain
         
         def initialize(*args)
+          debug{"OmniAuth::Slack::Client#initialize args: #{args}"}
           super
           self.logger = OmniAuth.logger
           self.history = {}
@@ -47,6 +48,22 @@ module OmniAuth
           else
             super
           end
+        end
+
+        # Overrides #authorize_url to handle a proc (allowing influence from flow_version).
+        def authorize_url(*args)
+          if options[:authorize_url].is_a?(Proc)
+            options[:authorize_url] = instance_eval &(options[:authorize_url])
+          end
+          super
+        end
+        
+        # Overrides #token_url to handle a proc (allowing influence from flow_version).
+        def token_url(*args)
+          if options[:token_url].is_a?(Proc)
+            options[:token_url] = instance_eval &(options[:token_url])
+          end
+          super
         end
         
       end

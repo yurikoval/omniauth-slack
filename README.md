@@ -127,8 +127,20 @@ TODO: Fix all references to 'above'.
 Authentication options are specified in the provider block, as shown above, and all are optional except for `:scope`.
 You will need to specify at least one scope to get a successful authentication and authorization.
 
+<<<<<<< HEAD
 TODO: Fix this reference to 'below'.
 Some of these options can also be given at runtime in the authorization request url (See __pass\_through\_params__ below).
+=======
+Some of these options can also be given at runtime in the authorization request url.
+
+`scope`, `team`, `team_domain`, and `redirect_uri` can be given at runtime. `scope`, `team`, and `redirect_uri` will be passed directly through to Slack in the OAuth GET request:
+
+```ruby
+https://slack.com/oauth/v2/authorize?scope=identity.basic,identity.email&team=team-id&redirect_uri=https://different.subdomain/different/callback/path
+```
+
+`team_domain` will be inserted into the GET request as a subdomain `https://team-domain.slack.com/oauth/v2/authorize`.
+>>>>>>> d79b857... Update URLs to use Slack's "V2 OAuth 2.0 flow"
 
 More information on provider and authentication options can be found in omniauth-slack's supporting gems [omniauth](https://github.com/omniauth/omniauth), [oauth2](https://github.com/oauth-xx/oauth2), and [omniauth-oauth2](https://github.com/omniauth/omniauth-oauth2).
 
