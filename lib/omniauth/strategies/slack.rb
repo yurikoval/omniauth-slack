@@ -59,7 +59,8 @@ module OmniAuth
         site: 'https://slack.com',
         authorize_url: proc{"/oauth/#{@options[:flow_version]=='v2' ? 'v2/' : ''}authorize"},
         token_url: proc{"/api/oauth.#{@options[:flow_version]=='v2' ? 'v2.' : ''}access"},
-        auth_scheme: :basic_auth
+        auth_scheme: :basic_auth,
+        raise_errors: false # TEMP hack to allow Slack's weird get-token response.
       }
       
       # Authorization token-exchange API call options.

@@ -27,6 +27,9 @@ module OmniAuth
           rslt
         end
         
+        # A temporary hack to make Slack's new token response compatible with the Oauth2 gem.s
+        def response_contains_token; true; end
+        
         # Logs each API request and stores the API result in @history hash.
         # TODO: There should be some kind of option to disable this.
         def request(*args)
