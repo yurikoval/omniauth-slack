@@ -1,12 +1,11 @@
 require 'omniauth-slack/refinements'
 require 'logger'
 
-# Appends 'TRACE' option to Logger levels
+# Appends 'TRACE' option to Logger levels.
 sev_label_new = Logger::SEV_LABEL.dup
-sev_label_new <<  'TRACE'
+sev_label_new << 'TRACE'
 Logger::Severity::TRACE = (sev_label_new.size - 1)
 Logger.send(:remove_const, :SEV_LABEL)
-#Logger::SEV_LABEL = %w(DEBUG INFO WARN ERROR FATAL ANY TRACE).freeze
 Logger::SEV_LABEL = sev_label_new.freeze
 
 module OmniAuth

@@ -70,6 +70,8 @@ module OmniAuth
         mode: :query,
         param_name: 'token'
       }
+
+
       
       # User ID is not guaranteed to be globally unique across all Slack users.
       # The combination of user ID and team ID, on the other hand, is guaranteed
@@ -79,8 +81,8 @@ module OmniAuth
       # Gathers access_token and awarded scopes.
       credentials do
         {
-          token_type: access_token['token_type'],
-          scope: access_token['scope'],
+          token_type: access_token['token_type'] || access_token['authed_user'].to_h['token_type'],
+          scope: access_token['scope'] || access_token['authed_user'].to_h['scope'],
           scopes: access_token.all_scopes
         }
       end
@@ -130,6 +132,7 @@ module OmniAuth
       # Gathers additiona API calls, user-defined additional_data method responses, and raw Slack API responses.
       extra do
         {
+          #authed_user: access_token['authed_user'].to_h,
           # scopes_requested: (env['omniauth.params'] && env['omniauth.params']['scope']) || \
           #   (env['omniauth.strategy'] && env['omniauth.strategy'].options && env['omniauth.strategy'].options.scope),
           scopes_requested: scopes_requested,
@@ -323,13 +326,22 @@ module OmniAuth
         source(:api_users_profile) { deep_find 'display_name' }
       end
 
+      # data_method :api_users_identity,
+      #   scope: {classic:'identity.basic', identity:'identity:read:user'},
+      #   storage: :api_users_identity,
+      #   condition: proc{ true },
+      #   default_value: {},
+      #   source: [
+      #     {name: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
+      #   ]
+
       data_method :api_users_identity,
-        scope: {classic:'identity.basic', identity:'identity:read:user'},
+        #scope: {classic:'identity.basic', identity:'identity:read:user'},
         storage: :api_users_identity,
         condition: proc{ true },
         default_value: {},
         source: [
-          {name: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
+          {name: 'user_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
         ]
 
       data_method :api_users_info do
@@ -376,9 +388,14 @@ module OmniAuth
       #   source :access_token, 'apps_permissions_users_list(user_id)'
       # end 
 
-      # This hash is handed to the access-token, which in turn fills it with API response objects.
+      # This hash is handed to the access-token (or is it the AuthHash?), which in turn fills it with API response objects.
       def raw_info
         @raw_info ||= {}
+      end
+      
+      # Gets 'authed_user' sub-token from main access token.
+      def user_token
+        access_token.user_token
       end
 
       # Is this a workspace app token?

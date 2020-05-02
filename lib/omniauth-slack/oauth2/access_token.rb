@@ -21,6 +21,18 @@ module OmniAuth
 
         # AccessToken instance (self), so Strategy data-methods can be copied to AccessToken without modification.
         def access_token; self; end
+        
+        # Converts 'authed_user' hash (of Slack v2 oauth flow) to AccessToken object.
+        # Use this to call API methods from a user-token.
+        def user_token
+          @user_token ||= (
+            if params['authed_user']
+              @user_token = self.class.from_hash(client, params['authed_user']) 
+            elsif params['token_type'] == 'user'
+              @user_token = self
+            end
+          )
+        end
 
         # Creates simple getter methods to pull specific data from params.
         %w(user_name user_email team_id team_name team_domain).each do |word|

@@ -21,7 +21,7 @@ module OmniAuth
           #options[:skip_token_validation] && skip_token_validation
         end
                 
-        # Overrides OAuth2::Client#get_token to pass in the omniauth-slack AccessToken.
+        # Overrides OAuth2::Client#get_token to pass in the omniauth-slack AccessToken class.
         def get_token(params, access_token_opts = {}, access_token_class = OmniAuth::Slack::OAuth2::AccessToken) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
           rslt = super(params, access_token_opts, access_token_class)
           #debug{"Client #{self} built AccessToken #{rslt.to_yaml}"}
