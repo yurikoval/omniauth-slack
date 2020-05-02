@@ -1,4 +1,13 @@
 require 'omniauth-slack/refinements'
+require 'logger'
+
+# Appends 'TRACE' option to Logger levels
+sev_label_new = Logger::SEV_LABEL.dup
+sev_label_new <<  'TRACE'
+Logger::Severity::TRACE = (sev_label_new.size - 1)
+Logger.send(:remove_const, :SEV_LABEL)
+#Logger::SEV_LABEL = %w(DEBUG INFO WARN ERROR FATAL ANY TRACE).freeze
+Logger::SEV_LABEL = sev_label_new.freeze
 
 module OmniAuth
   module Slack
@@ -26,7 +35,7 @@ module OmniAuth
             when String; klass
             else klass.to_s
           end
-          klass_name = klass.split('::').last
+          klass_name = klass.to_s.split('::').last.to_s
           log_text = yield
           full_text = "(#{klass_name} #{method_name}) #{log_text}"
           
@@ -35,7 +44,7 @@ module OmniAuth
             return unless full_text[regexp]
           end
           
-          OmniAuth.logger.debug(full_text)
+          OmniAuth.logger.log(Logger::TRACE, full_text)
         end
       end
       

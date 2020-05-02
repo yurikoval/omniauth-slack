@@ -27,7 +27,8 @@ module OmniAuth
           obj, atrb = word.split('_')
           define_method(word) do
             params[word] ||
-            params[obj].to_h[atrb]
+            params[obj].to_h[atrb] ||
+            params['authed_user'].to_h[atrb]
           end
         end
 
@@ -35,7 +36,8 @@ module OmniAuth
         def user_id
           params['user_id'] ||
           params['user'].to_h['id'] ||
-          params['authorizing_user'].to_h['user_id']
+          params['authorizing_user'].to_h['user_id'] ||
+          params['authed_user'].to_h['id']
         end
         
         # Cannonical AccessToken unique user-team-id combo.
@@ -43,12 +45,12 @@ module OmniAuth
           "#{user_id}-#{team_id}"
         end
       
-        # Is this a workspace app token?
+        # Is this a workspace app (or bot) token?
         #
         # Returns nil if unknown
         def is_app_token?
           case
-            when params['token_type'] == 'app' || token.to_s[/^xoxa/]
+            when params['token_type'] == 'app' || token.to_s[/^xoxa/] || params['token_type'] == 'bot'
               true
             when token.to_s[/^xoxp/]
               false
@@ -59,8 +61,11 @@ module OmniAuth
         
         # Is this a token returned from an identity-scoped request?
         def is_identity_token?
-          (params['user_id'] ||
-          params['user'].to_h['id']) && true || false
+          (
+          params['user_id'] ||
+          params['user'].to_h['id'] ||
+          params['authed_user'].to_h['id']
+          ) && true || false
         end
       
         # Identity scopes (workspace apps only).
@@ -83,6 +88,8 @@ module OmniAuth
         end
         
         # Hash of current scopes for this token (workspace apps only).
+        # NOTE: Workspace apps are deprecated!
+        #
         # Sets +@apps_permissions_scopes_list+ with parsed API response.
         def apps_permissions_scopes_list
           return {} unless is_app_token?
