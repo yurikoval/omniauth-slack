@@ -106,10 +106,10 @@ module OmniAuth
       #
       credentials do
         {
-          token_type: access_token['token_type'] || user_token['token_type'],
-          scope: access_token['scope'] || user_token['scope'],
-          scopes: access_token.all_scopes || user_token.all_scopes,
-          token: access_token.token || user_token.token
+          token_type: access_token['token_type'] || user_token&.[]('token_type'),
+          scope: access_token['scope'] || user_token&.[]('scope'),
+          scopes: access_token.all_scopes || user_token&.all_scopes,
+          token: access_token.token || user_token&.token
         }
       end
 

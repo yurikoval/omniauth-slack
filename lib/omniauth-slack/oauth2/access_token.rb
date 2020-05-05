@@ -169,7 +169,7 @@ module OmniAuth
         # and *value* is Array of scopes.
         #
         def all_scopes(_user_id=nil)
-          debug{"_user_id: #{_user_id}, @all_scopes: #{@all_scopes}"}
+          #debug{"_user_id: #{_user_id}, @all_scopes: #{@all_scopes}"}
           if _user_id && !@all_scopes.to_h.has_key?('identity') || @all_scopes.nil?
             @all_scopes = (
               scopes = case
@@ -217,8 +217,8 @@ module OmniAuth
         # TODO: Does this accept all slack token types? What about bot tokens? Others?
         #
         def has_scope?(*freeform_array, query: nil, logic:'or', user:nil, base:nil, **freeform_hash)
-          debug{{freeform_array:freeform_array, freeform_hash:freeform_hash, query:query, logic:logic, user:user, base:base}}
           #OmniAuth.logger.debug({freeform_array:freeform_array, freeform_hash:freeform_hash, query:query, logic:logic, user:user, base:base})
+          #debug{{freeform_array:freeform_array, freeform_hash:freeform_hash, query:query, logic:logic, user:user, base:base}}
           
           query ||= case
             when freeform_array.any?; freeform_array
@@ -228,7 +228,7 @@ module OmniAuth
           
           query = [query].flatten if query.is_a?(Array)
           user ||= user_id
-          debug{"using user '#{user}' and query '#{query}'"}
+          #debug{"using user '#{user}' and query '#{query}'"}
           
           is_identity_query = case query
             when Hash
@@ -239,10 +239,10 @@ module OmniAuth
           
           base ||= case
             when user && is_identity_query
-              debug{"calling all_scopes(user=#{user}) to build base-scopes"}
+              #debug{"calling all_scopes(user=#{user}) to build base-scopes"}
               all_scopes(user)
             else
-              debug{"calling all_scopes to build base-scopes"}
+              #debug{"calling all_scopes to build base-scopes"}
               all_scopes
           end
           
@@ -280,21 +280,23 @@ module OmniAuth
         # It ~should~ work for other providers, according to oauth2 spec https://tools.ietf.org/html/rfc6749#section-3.3
         #
         def self.has_scope?(scope_query:{}, scope_base:{}, logic:'or')
-          debug{"class-level-has_scope? scope_query '#{scope_query}' scope_base '#{scope_base}' logic '#{logic}'"}
+          debug{"class-level scope_query '#{scope_query}' scope_base '#{scope_base}' logic '#{logic}'"}
           _scope_query = scope_query.is_a?(String) ? {classic: scope_query} : scope_query
           _scope_query = [_scope_query].flatten
           _scope_base  = scope_base
           raise "scope_base must be a hash" unless (_scope_base.is_a?(Hash) || _scope_base.respond_to?(:to_h))
+          
+          out=false
           
           _logic = case
             when logic.to_s.downcase == 'or'; {outter: 'all?', inner: 'any?'}
             when logic.to_s.downcase == 'and'; {outter: 'any?', inner: 'all?'}
             else {outter: 'all?', inner: 'any?'}
           end
-          debug{"logic #{_logic.inspect}"}
+          #debug{"logic #{_logic.inspect}"}
           
           _scope_query.send(_logic[:outter]) do |query|
-            debug{"outter query: #{_scope_query.inspect}"}
+            #debug{"outter query: #{_scope_query.inspect}"}
 
             query.send(_logic[:inner]) do |section, scopes|
               test_scopes = case
@@ -304,12 +306,15 @@ module OmniAuth
               end
               
               test_scopes.send(_logic[:inner]) do |scope|
-                debug{"inner query section: #{section.to_s}, scope: #{scope}"}
-                _scope_base.to_h[section.to_s].to_a.include?(scope.to_s)
+                #debug{"inner query section: #{section.to_s}, scope: #{scope}"}
+                out = _scope_base.to_h[section.to_s].to_a.include?(scope.to_s)
               end
             end
             
-          end # scope_query.each
+          end # scope_query.send outter-query
+          debug{"output: #{out}"}
+          return out
+          
         end # self.has_scope?
         
       end # AccessToken
