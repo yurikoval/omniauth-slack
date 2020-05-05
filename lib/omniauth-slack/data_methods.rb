@@ -42,7 +42,7 @@ module OmniAuth
     # * Assign data source priority for methods that can pull from multiple sources.
     # * Skip descendant source traversal, when the end point is known to be blocked/down.
     #
-    # Include +DataMethods+ module in your +OmniAuth::Strategy+ class or in your
+    # Include +DataMethods+ module in your +OmniAuth::Strategy+ class and/or in your
     # +OAuth2::AccessToken+ class to gain flexible method dependency management.
     # Control which data-methods get called and in what priority
     # with the +OmniAuth::Builder+ block provider option +:dependencies+.
@@ -66,7 +66,7 @@ module OmniAuth
       end
 
       
-      # Strategy instance data-method dependencies.
+      # Strategy or AccessToken instance data-method dependencies.
       # :markup: tomdoc
       #
       # The methods listed here will be called, in listed order,
@@ -118,7 +118,8 @@ module OmniAuth
       def data_methods; self.class.data_methods; end
       
       # Adds result of each method to +info+ hash, keyed by +:info_key+.
-      # TODO: Rework this method to run for only for methods with a defined +:info_key+.
+      # TODO: Rework this method to run only for methods with a defined +:info_key+.
+      # TODO: Is this still used? It is disabled in the Strategy class.
       def apply_data_methods(rslt = Hashy.new)
         data_methods.each do |name, opts|
           key = opts[:info_key]
@@ -170,7 +171,7 @@ module OmniAuth
           data_methods.inject({}){|h,a| k,v = a[0], a[1]; h[k] = v.dependency_hash; h}
         end
 
-        # Strategy class dependencies.
+        # Strategy or AccessToken class dependencies.
         # Flattens compiled dependency_tree into an array of uniq strings.
         #
         # TODO: I think this can be cleaned up & simplified.
@@ -426,19 +427,19 @@ module OmniAuth
       end
       
       # Resolves all conditions and returns true or false.
-      def resolve_conditions(strategy, conditions = condition)
+      def resolve_conditions(strategy_or_access_token, conditions = condition)
         #log :debug, "Resolve_conditions for data-method '#{name}' with conditions '#{conditions}'"
         debug{"Resolve_conditions for data-method '#{name}' with conditions '#{conditions}'"}
         return true unless conditions
         rslt = case conditions
-          when Proc; strategy.instance_eval(&conditions)
-          when String; strategy.send :eval, conditions.to_s
+          when Proc; strategy_or_access_token.instance_eval(&conditions)
+          when String; strategy_or_access_token.send :eval, conditions.to_s
           when Array;
             if conditions.size > 1
-              conditions.all?{|c| resolve_conditions(strategy, c)}
+              conditions.all?{|c| resolve_conditions(strategy_or_access_token, c)}
             else
               #strategy.send :eval, conditions[0]
-              resolve_conditions(strategy, conditions[0])
+              resolve_conditions(strategy_or_access_token, conditions[0])
             end
           else conditions
         end ? true : false
@@ -448,43 +449,43 @@ module OmniAuth
       end
       
       # Resolves all scope queries and returns true or false.
-      def resolve_scope(strategy)
+      def resolve_scope(strategy_or_access_token)
         scopes = scope
         case scopes
           when NilClass; true
           when :empty?.to_proc; true
           when Array;
             debug{"Resolve_scope array #{scopes}"}
-            strategy.send(:has_scope?, *scopes)
+            strategy_or_access_token.send(:has_scope?, *scopes)
           when Hash;
             debug{"resolve_scope hash #{scopes}"}
-            strategy.send(:has_scope?, **scopes)
+            strategy_or_access_token.send(:has_scope?, **scopes)
           else raise "Scope query object #{scopes} was not handled."
         end
       end
       
       # Resolves a single source definition.
-      def resolve_source(src, strategy)
-        source_target = src.respond_to?(:name) ? src.name : strategy
+      def resolve_source(src, strategy_or_access_token)
+        source_target = src.respond_to?(:name) ? src.name : strategy_or_access_token
         source_code = case
           when src.respond_to?(:code);src.code
           when src.is_a?(Proc); src
           else proc{self}
         end
-        #log :debug, "'#{name}' calling source_target '#{source_target}' on klass_instance '#{strategy}' with code '#{source_code}'."
-        #debug{"'#{name}' calling source_target '#{source_target}' on klass_instance '#{strategy}' with code '#{source_code}'."}
+        #log :debug, "'#{name}' calling source_target '#{source_target}' on klass_instance '#{strategy_or_access_token}' with code '#{source_code}'."
+        #debug{"'#{name}' calling source_target '#{source_target}' on klass_instance '#{strategy_or_access_token}' with code '#{source_code}'."}
         
         target_result = case source_target
           when 'default'
-            strategy
+            strategy_or_access_token
           when NilClass
-            strategy
+            strategy_or_access_token
           when String
-            strategy.send(:eval, source_target)
+            strategy_or_access_token.send(:eval, source_target)
           when Symbol
-            strategy.send(source_target)
+            strategy_or_access_token.send(source_target)
           when Proc
-            strategy.instance_eval(&source_target)
+            strategy_or_access_token.instance_eval(&source_target)
           else
             source_target
         end
@@ -508,64 +509,64 @@ module OmniAuth
       end
       
       # Resolves the default-value, if defined, or returns nil.
-      def resolve_default_value(strategy)
+      def resolve_default_value(strategy_or_access_token)
         dval = default_value
         case dval
         # Since dval could be string or symbol, the only time it should be processed is when it is a proc.
         #
         # when String
-        #   strategy.send(:eval, dval)
+        #   strategy_or_access_token.send(:eval, dval)
         # when Symbol
-        #   strategy.send(dval)
+        #   strategy_or_access_token.send(dval)
         when Proc
-          strategy.instance_eval(&dval)
+          strategy_or_access_token.instance_eval(&dval)
         else
           dval
         end
       end
       
       # Selects valid accessible sources to attempt resolution on.
-      def select_sources(strategy)
+      def select_sources(strategy_or_access_token)
         sources = source
-        strategy.instance_eval do
-          strategy_dependencies = dependencies
+        strategy_or_access_token.instance_eval do
+          strategy_or_access_token_dependencies = dependencies
           master_dependencies_filtered = dependencies(dependency_filter)
           sources.select do |src|
-            strategy_dependencies.include?(src.name.to_s) ||
+            strategy_or_access_token_dependencies.include?(src.name.to_s) ||
             !master_dependencies_filtered.include?(src.name.to_s) ||
             src.name == 'default'
-          end.sort_with(strategy_dependencies){|v| v.name.to_s}
+          end.sort_with(strategy_or_access_token_dependencies){|v| v.name.to_s}
         end
       end
       
       # Wraps a memoization-with-ivar around a given block.
-      def with_cache(strategy, &block)
+      def with_cache(strategy_or_access_token, &block)
         storage_name = case storage
           when false; false
           when nil; name
           when storage; storage
         end
         if storage_name
-          ivar_data = strategy.instance_variable_get("@#{storage_name}")
+          ivar_data = strategy_or_access_token.instance_variable_get("@#{storage_name}")
           return ivar_data if ivar_data
         end
         result = yield
-        strategy.instance_variable_set("@#{storage_name}", result) if result && storage_name
+        strategy_or_access_token.instance_variable_set("@#{storage_name}", result) if result && storage_name
         result
       end
       
-      # Processes this DataMethod in the context of the given Strategy instance.
-      def call(strategy)
-        with_cache(strategy) do
+      # Processes this DataMethod in the context of the given strategy-or-access-token instance.
+      def call(strategy_or_access_token)
+        with_cache(strategy_or_access_token) do
           result = nil
-          resolve_scope(strategy) &&
-          resolve_conditions(strategy) &&
-          select_sources(strategy).each do |src|
-            result = resolve_source(src, strategy)
+          resolve_scope(strategy_or_access_token) &&
+          resolve_conditions(strategy_or_access_token) &&
+          select_sources(strategy_or_access_token).each do |src|
+            result = resolve_source(src, strategy_or_access_token)
             break if result
           end
           
-          result ||= resolve_default_value strategy
+          result ||= resolve_default_value strategy_or_access_token
           #log :debug, "Data method '#{name}' returning: #{result}"
           debug{"Data method '#{name}' returning: #{result}"}
           result

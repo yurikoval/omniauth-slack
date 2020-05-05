@@ -16,6 +16,27 @@ module OmniAuth
     
       class AuthHash < OmniAuth::Slack::AuthHash;
       end
+      
+      
+      # Adds user-defined additional-data-methods to this
+      # class and to OmniAuth::Slack::AccessToken class.
+      #
+      # TODO: Should we really automatically define methods on both the Strategy AND the AccessToken?
+      # Should it be a user option to define the methods on the AccessToken?
+      #
+      def self.define_additional_data(definitions={})
+        return if @additional_data_defined
+        if !definitions.to_h.empty?
+          definitions.each do |k,v|
+            data_method(k, v)
+            OmniAuth::Slack::OAuth2::AccessToken.data_method(k, v)
+          end
+          @additional_data_defined = 1
+        end
+      end
+
+      
+      ###  Options  ###
     
       debug{"#{self} setting up default options"}
       
@@ -55,14 +76,13 @@ module OmniAuth
 
       # OAuth2::Client options.
       option :client_options, {
-        flow_version: 'v2',
         site: 'https://slack.com',
         #authorize_url: proc{"/oauth/#{@options[:flow_version]=='v2' ? 'v2/' : ''}authorize"},
         authorize_url: '/oauth/v2/authorize',
         #token_url: proc{"/api/oauth.#{@options[:flow_version]=='v2' ? 'v2.' : ''}access"},
         token_url: '/api/oauth.v2.access',
         auth_scheme: :basic_auth,
-        raise_errors: false, # MUST be false to allow Slack's non-compliant get-token response.
+        raise_errors: false, # MUST be false to allow Slack's non-compliant get-token response in v2 flow.
       }
       
       # Authorization token-exchange API call options.
@@ -72,29 +92,39 @@ module OmniAuth
       }
 
 
+      ###  Data  ###
       
       # User ID is not guaranteed to be globally unique across all Slack users.
       # The combination of user ID and team ID, on the other hand, is guaranteed
       # to be globally unique.
-      uid { "#{user_id}-#{team_id}" }
+      #
+      #uid { "#{user_id}-#{team_id}" }
+      uid { access_token.uid }
 
-      # Gathers access_token and awarded scopes.
+
+      # Gathers access_token and awarded scopes for :credentials section of AuthHash.
+      #
       credentials do
         {
-          token_type: access_token['token_type'] || access_token['authed_user'].to_h['token_type'],
-          scope: access_token['scope'] || access_token['authed_user'].to_h['scope'],
-          scopes: access_token.all_scopes
+          token_type: access_token['token_type'] || user_token['token_type'],
+          scope: access_token['scope'] || user_token['scope'],
+          scopes: access_token.all_scopes || user_token.all_scopes,
+          token: access_token.token || user_token.token
         }
       end
 
-      # Gathers a myriad of possible data returned from omniauth-slack /api/oauth.access call.
+
+      # Gathers a myriad of possible data returned from omniauth-slack /api/oauth.access call,
+      # for :info section of AuthHash.
+      #
       info do        
         num_threads, method_names = options.preload_data_with_threads
         if num_threads.to_i > 0
           preload_data_with_threads(num_threads.to_i, method_names || dependencies + options.additional_data.to_h.keys)
         end
      
-        # Start with only what we can glean from the authorization response.
+        # Starts with only what we can glean from the authorization response.
+        #
         hash = OmniAuth::Slack::Hashy.new(
           name: user_name,
           email: user_email,
@@ -104,15 +134,17 @@ module OmniAuth
           team_domain: team_domain,
           team_image: team_image,
           team_email_domain: team_email_domain,
+          bot_user_id: access_token['bot_user_id'],
           nickname: nickname,
           image: image
         )
 
         # Disabled to manually define info.
-        # TODO: This might be obsoldete now?
+        # TODO: This might be obsoldete now? See data_methods.rb
         #apply_data_methods(hash)
 
         # Adds data from api_users_info and/or api_users_profile, if allowed by scope and other settings.
+        #
         unless skip_info?
           %w(first_name last_name phone skype avatar_hash real_name real_name_normalized).each do |key|
             hash[key.to_sym] = (
@@ -129,7 +161,10 @@ module OmniAuth
         hash
       end # info
 
-      # Gathers additiona API calls, user-defined additional_data method responses, and raw Slack API responses.
+
+      # Gathers additiona API calls, user-defined additional_data_method responses, and raw Slack API responses,
+      # for :extra section of AuthHash.
+      #
       extra do
         {
           #authed_user: access_token['authed_user'].to_h,
@@ -139,8 +174,9 @@ module OmniAuth
           web_hook_info: web_hook_info,
           bot_info: access_token['bot'] || api_bots_info['bot'],
           access_token_hash: access_token.to_hash,
-          #identity: @identity,
-          identity: @api_users_identity,
+          #identity: @api_users_identity,
+          #identity: access_token.instance_variable_get(:@api_users_identity) || user_token.instance_variable_get(:@api_users_identity),
+          identity: api_users_identity,
           user_info: @api_users_info,
           user_profile: @api_users_profile,
           team_info: @api_team_info,
@@ -149,23 +185,11 @@ module OmniAuth
         }
       end
       
-      # Adds user-defined additional_data methods to this
-      # class and to OmniAuth::Slack::AccessToken class.
-      def self.define_additional_data(definitions={})
-        return if @additional_data_defined
-        if !definitions.to_h.empty?
-          definitions.each do |k,v|
-            data_method(k, v)
-            OmniAuth::Slack::OAuth2::AccessToken.data_method(k, v)
-          end
-          @additional_data_defined = 1
-        end
-      end
-
 
       # Overrides OmniAuth::Oauth2#authorize_params so that
       # specified params can be passed on to Slack authorization GET request.
       # See https://github.com/omniauth/omniauth/issues/390
+      #
       def authorize_params
         super.tap do |prms|
           params_digest = prms.hash
@@ -175,6 +199,7 @@ module OmniAuth
           session['omniauth.authorize_params'] = prms
         end
       end
+      
       
       # Overrides OmniAuth callback phase to extract session var
       # for omniauth.authorize_params into env (this is how omniauth does this).
@@ -187,6 +212,7 @@ module OmniAuth
         
         result = super
       end
+      
       
       # Overrides OmniAuth::Strategies::OAuth2#client to define custom behavior.
       #
@@ -214,7 +240,9 @@ module OmniAuth
         new_client
       end
 
+
       # Dropping query_string from callback_url prevents some errors in call to /api/oauth.[v2.]access.
+      #
       def callback_url
         full_host + script_name + callback_path
       end
@@ -223,6 +251,7 @@ module OmniAuth
       private
       
       # Gets and decodes :pass_through_params option.
+      #
       def pass_through_params
         ptp = [options.pass_through_params].flatten.compact
         case
@@ -235,7 +264,9 @@ module OmniAuth
         end
       end
       
+      
       # Runs/calls/compiles results from additional_data definitions.
+      #
       def get_additional_data
         if false && skip_info?
           {}
@@ -247,20 +278,31 @@ module OmniAuth
         end
       end
 
+
       def user_id
         # access_token['user_id'] || access_token['user'].to_h['id'] || access_token['authorizing_user'].to_h['user_id']
         access_token.user_id
       end
+
       
       def team_id
         # access_token['team_id'] || access_token['team'].to_h['id']
         access_token.team_id
       end
+
       
       # Parsed data returned from /slack/oauth.[v2.]access api call.
+      #
+      # Where does this actually go? Where is it used?
+      #
+      # Simplifying this to just 'access_token.to_hash' does not appear to
+      # have any noticeable negative effect.
+      #
       def auth
-        @auth ||= access_token.params.to_h.merge({'token' => access_token.token})
+        #@auth ||= access_token.params.to_h.merge({'token' => access_token.token})
+        @auth ||= access_token.to_hash
       end
+
 
       def web_hook_info
         #return {} unless access_token.key? 'incoming_webhook'
@@ -335,14 +377,18 @@ module OmniAuth
       #     {name: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
       #   ]
 
-      data_method :api_users_identity,
-        #scope: {classic:'identity.basic', identity:'identity:read:user'},
-        storage: :api_users_identity,
-        condition: proc{ true },
-        default_value: {},
-        source: [
-          {name: 'user_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
-        ]
+      # data_method :api_users_identity,
+      #   #scope: {classic:'identity.basic', identity:'identity:read:user'},
+      #   storage: :api_users_identity,
+      #   condition: proc{ true },
+      #   default_value: {},
+      #   source: [
+      #     {name: 'user_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
+      #   ]
+      
+
+
+      ###  TODO: Move these API data methods to the AccessToken.  ###
 
       data_method :api_users_info do
         default_value AuthHash.new
@@ -386,19 +432,34 @@ module OmniAuth
       #   default_value {}
       #   condition proc { is_app_token? }
       #   source :access_token, 'apps_permissions_users_list(user_id)'
-      # end 
+      # end
+      
+      
+      def api_users_identity
+        #access_token.user_token.api_users_identity
+        if access_token['token_type'].to_s == 'user'
+          access_token.api_users_identity
+        elsif access_token['token_type'].to_s == '' && access_token.user_token
+          access_token.user_token.api_users_identity
+        else
+          {}
+        end
+      end
 
       # This hash is handed to the access-token (or is it the AuthHash?), which in turn fills it with API response objects.
+      #
       def raw_info
         @raw_info ||= {}
       end
       
       # Gets 'authed_user' sub-token from main access token.
+      #
       def user_token
         access_token.user_token
       end
 
       # Is this a workspace app token?
+      #
       def is_app_token?
         access_token.is_app_token?
       end
@@ -413,6 +474,9 @@ module OmniAuth
       end
       
       # Copies the api_* data-methods to AccessToken.
+      # TODO: Should this be left up the user, or even removed entirely.
+      # How would users specify where their data-methods are being defined/attached?
+      #
       data_methods.each{|k,v| OmniAuth::Slack::OAuth2::AccessToken.data_method(k, v) if k.to_s[default_options.dependency_filter]}
       
     end # Slack

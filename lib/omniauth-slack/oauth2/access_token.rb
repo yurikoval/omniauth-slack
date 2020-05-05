@@ -5,6 +5,26 @@ require 'omniauth-slack/refinements'
 require 'omniauth-slack/data_methods'
 require 'omniauth-slack/debug'
 
+# The AccessToken object is built from an access-token-hash, which is returned from the get-token
+# API request or is passed in manually via AccessToken.from_hash(). See OmniAuth::Slack::build_access_token.
+#
+# The original access-token hash can always be found at AccessToken#params.
+# As a convenience, you can call '[]' on the params hash by sending
+# the method and args directly to the access-token object.
+#
+#     my_token['ok']      --> true
+#     my_token['app_id']  --> A012345678
+#
+# The AccessToken object moves some things around a little bit, for example: The params['access_token']
+# string is moved to the top level of the access-token object.
+#
+#     my_token.token      --> xoxb-123456789...
+#
+# You will see a 'scopes' hash in access-token data. This is only for storage of the compiled 'all_scopes'.
+# You can use the hash if you want, but you can also just call my_token.all_scopes.
+# Note that all_scopes and the 'scopes' hash will be different for the different types of tokens.
+
+
 module OmniAuth
   module Slack
     using StringRefinements
@@ -22,14 +42,20 @@ module OmniAuth
         # AccessToken instance (self), so Strategy data-methods can be copied to AccessToken without modification.
         def access_token; self; end
         
+        # Intercept super to return nil instead of empty string.
+        def token
+          rslt = super
+          rslt.to_s == '' ? nil : rslt
+        end
+        
         # Converts 'authed_user' hash (of Slack v2 oauth flow) to AccessToken object.
         # Use this to call API methods from a user-token.
         def user_token
           @user_token ||= (
-            if params['authed_user']
-              @user_token = self.class.from_hash(client, params['authed_user']) 
-            elsif params['token_type'] == 'user'
-              @user_token = self
+            if params['token_type'] == 'user'
+              self
+            elsif params['authed_user']
+              self.class.from_hash(client, params['authed_user']) 
             end
           )
         end
@@ -39,16 +65,17 @@ module OmniAuth
           obj, atrb = word.split('_')
           define_method(word) do
             params[word] ||
-            params[obj].to_h[atrb] ||
-            params['authed_user'].to_h[atrb]
+            params[obj].to_h[atrb] #||
           end
         end
 
         # Cannonical AccessToken user_id.
         def user_id
+          params['bot_user_id'] ||
           params['user_id'] ||
           params['user'].to_h['id'] ||
           params['authorizing_user'].to_h['user_id'] ||
+          # This will pull from the sub-token 'authed_user' if no user_id found yet.
           params['authed_user'].to_h['id']
         end
         
@@ -62,7 +89,9 @@ module OmniAuth
         # Returns nil if unknown
         def is_app_token?
           case
-            when params['token_type'] == 'app' || token.to_s[/^xoxa/] || params['token_type'] == 'bot'
+            when params['token_type'] == 'app' || token.to_s[/^xoxa/]
+              true
+            when params['token_type'] == 'bot' || token.to_s[/^xoxb/]
               true
             when token.to_s[/^xoxp/]
               false
@@ -74,11 +103,25 @@ module OmniAuth
         # Is this a token returned from an identity-scoped request?
         def is_identity_token?
           (
+          token.to_s[/^xoxp/] ||
           params['user_id'] ||
-          params['user'].to_h['id'] ||
-          params['authed_user'].to_h['id']
+          params['user'].to_h['id'] #||
+          #params['authed_user'].to_h['id']
           ) && true || false
         end
+        
+        
+        # Experimental data-method in AccessToken instead of in strategy (Slack).
+        data_method :api_users_identity,
+          scope: {classic:'identity.basic', identity:'identity:read:user'},
+          storage: :api_users_identity,
+          #condition: proc{ true },
+          condition: proc{ params['token_type']=='user' },
+          default_value: {},
+          source: [
+            {name: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
+          ]
+        
       
         # Identity scopes (workspace apps only).
         # Given _user_id, returns specific identity scopes.
