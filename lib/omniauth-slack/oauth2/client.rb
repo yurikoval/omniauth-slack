@@ -30,7 +30,7 @@ module OmniAuth
         end
         
         # Slack's new v2 oauth get-token response does not follow the OAUTH2 spec,
-        # if only a user_scope was requested.
+        # if only a user_scope was requested containing data in the team field.
         #
         # This is a temporary hack to make Slack's new v2 get-token response compatible
         # with the Oauth2 gem (which enforces the OAUTH2 spec for get-token response.

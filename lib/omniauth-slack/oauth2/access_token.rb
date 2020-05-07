@@ -48,6 +48,15 @@ module OmniAuth
           rslt.to_s == '' ? nil : rslt
         end
         
+        def token_type
+          params['token_type']
+        end
+        
+        def token_type?(_type)
+          debug("'#{_type}'")
+          token_type.to_s == _type.to_s
+        end
+        
         # Converts 'authed_user' hash (of Slack v2 oauth flow) to AccessToken object.
         # Use this to call API methods from a user-token.
         def user_token
@@ -87,18 +96,19 @@ module OmniAuth
         # Is this a workspace app (or bot) token?
         #
         # Returns nil if unknown
-        def is_app_token?
-          case
-            when params['token_type'] == 'app' || token.to_s[/^xoxa/]
-              true
-            when params['token_type'] == 'bot' || token.to_s[/^xoxb/]
-              true
-            when token.to_s[/^xoxp/]
-              false
-            else
-              nil
-          end
-        end
+        # def is_app_token?
+        #   case
+        #     #when params['token_type'] == 'app' || token.to_s[/^xoxa/]
+        #     when token_type?('app') || token.to_s[/^xoxa/]
+        #       true
+        #     when params['token_type'] == 'bot' || token.to_s[/^xoxb/]
+        #       true
+        #     when token.to_s[/^xoxp/]
+        #       false
+        #     else
+        #       nil
+        #   end
+        # end
         
         # Is this a token returned from an identity-scoped request?
         def is_identity_token?
@@ -132,7 +142,8 @@ module OmniAuth
         #
         def apps_permissions_users_list(_user_id=nil)
           #raise StandardError, "APUL caller #{caller_method_name} user #{_user_id}"
-          return {} unless is_app_token?
+          #return {} unless is_app_token?
+          return {} unless token_type?('app')
           semaphore.synchronize {
             @apps_permissions_users_list ||= (
               r = get('/api/apps.permissions.users.list').parsed
@@ -147,7 +158,8 @@ module OmniAuth
         #
         # Sets +@apps_permissions_scopes_list+ with parsed API response.
         def apps_permissions_scopes_list
-          return {} unless is_app_token?
+          #return {} unless is_app_token?
+          return {} unless token_type?('app')
             semaphore.synchronize {
             @apps_permissions_scopes_list ||= (
               r = get('/api/apps.permissions.scopes.list').parsed
@@ -173,15 +185,21 @@ module OmniAuth
           if _user_id && !@all_scopes.to_h.has_key?('identity') || @all_scopes.nil?
             @all_scopes = (
               scopes = case
+                when params['scope'] && params['token_type'] == 'bot'
+                  {'bot' => params['scope'].words}
+                when params['scope'] && params['token_type'] == 'user'
+                  {'user' => params['scope'].words}
                 when params['scope']
                   {'classic' => params['scope'].words}
                 when params['scopes']
                   params['scopes']
-                when is_app_token?
+                #when is_app_token?
+                when token_type?('app')
                   apps_permissions_scopes_list
               end
               
-              scopes['identity'] = apps_permissions_users_list(_user_id) if _user_id && is_app_token?
+              #scopes['identity'] = apps_permissions_users_list(_user_id) if _user_id && is_app_token?
+              scopes['identity'] = apps_permissions_users_list(_user_id) if _user_id && token_type?('app')
               params['scopes'] = scopes
             )
           else
