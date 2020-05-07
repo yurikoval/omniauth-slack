@@ -416,7 +416,8 @@ module OmniAuth
       
       data_method :api_bots_info do
         scope classic: 'users:read', team: 'users:read'
-        condition { !is_app_token? }
+        #condition { !is_app_token? }
+        condition { ! access_token.token_type?('app') }
         default_value Hash.new
         source :access_token do
           get('/api/bots.info').parsed
@@ -460,9 +461,11 @@ module OmniAuth
 
       # Is this a workspace app token?
       #
-      def is_app_token?
-        access_token.is_app_token?
-      end
+      # Deprecated!
+      #
+      # def is_app_token?
+      #   access_token.is_app_token?
+      # end
       
       def scopes_requested
         # omniauth.authorize_params is a custom enhancement to omniauth for omniauth-slack.

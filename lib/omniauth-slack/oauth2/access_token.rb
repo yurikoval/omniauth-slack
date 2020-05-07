@@ -16,15 +16,21 @@ require 'omniauth-slack/debug'
 #     my_token['app_id']  --> A012345678
 #
 # The AccessToken object moves some things around a little bit, for example: The params['access_token']
-# string is moved to the top level of the access-token object.
+# string is moved to the top level of the access-token object under the method 'token'.
 #
 #     my_token.token      --> xoxb-123456789...
 #
-# You will see a 'scopes' hash in access-token data. This is only for storage of the compiled 'all_scopes'.
+# For workspace-app tokens, you will see a 'scopes' hash in access-token data.
 # You can use the hash if you want, but you can also just call my_token.all_scopes.
-# Note that all_scopes and the 'scopes' hash will be different for the different types of tokens.
-
-
+# Tokens that have no inherent 'scopes' hash from Slack, will have it inserted based
+# on the 'scope' string.
+# 
+# See Slack's documentation on the different types of tokens available.
+#
+#     https://api.slack.com/methods/oauth.access
+#     https://api.slack.com/methods/oauth.v2.access
+#
+#
 module OmniAuth
   module Slack
     using StringRefinements
@@ -114,6 +120,7 @@ module OmniAuth
         # end
         
         # Is this a token returned from an identity-scoped request?
+        # TODO: Deprecated, use token_type?(...) instead.
         def is_identity_token?
           (
           token.to_s[/^xoxp/] ||
@@ -129,7 +136,7 @@ module OmniAuth
           scope: {classic:'identity.basic', identity:'identity:read:user'},
           storage: :api_users_identity,
           #condition: proc{ true },
-          condition: proc{ params['token_type']=='user' },
+          condition: proc{ token_type? 'user' },
           default_value: {},
           source: [
             {name: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
@@ -188,10 +195,10 @@ module OmniAuth
           if _user_id && !@all_scopes.to_h.has_key?('identity') || @all_scopes.nil?
             @all_scopes = (
               scopes = case
-                when params['scope'] && params['token_type'] == 'bot'
-                  {'bot' => params['scope'].words}
-                when params['scope'] && params['token_type'] == 'user'
-                  {'user' => params['scope'].words}
+                # when params['scope'] && token_type? 'bot'
+                #   {'bot' => params['scope'].words}
+                # when params['scope'] && token_type? 'user'
+                #   {'user' => params['scope'].words}
                 when params['scope']
                   {'classic' => params['scope'].words}
                 when params['scopes']
@@ -214,7 +221,7 @@ module OmniAuth
         # classic and workspace token compatible.
         #
         # If the scope-query is a string, it will be interpreted as a Slack Classic App
-        # scope string +{classic: scope-query-string}+.
+        # scope string +{classic: scope-query-string}+, even if the token is a v2 token.
         #
         # The keywords need to be symbols, so any hash passed as an argument
         # (or as the entire set of args) should have symbolized keys!
@@ -237,11 +244,12 @@ module OmniAuth
         #
         # TODO: Does this accept all slack token types? What about bot tokens? Others?
         #
-        def has_scope?(*freeform_array, query: nil, logic:'or', user:nil, base:nil, **freeform_hash)
+        def has_scope?(simple_string=nil, *freeform_array, query: nil, logic:'or', user:nil, base:nil, **freeform_hash)
           #OmniAuth.logger.debug({freeform_array:freeform_array, freeform_hash:freeform_hash, query:query, logic:logic, user:user, base:base})
           #debug{{freeform_array:freeform_array, freeform_hash:freeform_hash, query:query, logic:logic, user:user, base:base}}
           
           query ||= case
+            when simple_string; {classic: simple_string}
             when freeform_array.any?; freeform_array
             when freeform_hash.any?; freeform_hash
           end
