@@ -53,8 +53,10 @@ module OmniAuth
         end
         
         def token_type?(_type)
-          debug("'#{_type}'")
-          token_type.to_s == _type.to_s
+          debug{"'#{_type}'"}
+          [_type].flatten.any? do |t|
+            token_type.to_s == t.to_s
+          end
         end
         
         # Converts 'authed_user' hash (of Slack v2 oauth flow) to AccessToken object.
@@ -85,7 +87,8 @@ module OmniAuth
           params['user'].to_h['id'] ||
           params['authorizing_user'].to_h['user_id'] ||
           # This will pull from the sub-token 'authed_user' if no user_id found yet.
-          params['authed_user'].to_h['id']
+          params['authed_user'].to_h['id'] ||
+          params['id']
         end
         
         # Cannonical AccessToken unique user-team-id combo.
