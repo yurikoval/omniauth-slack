@@ -429,7 +429,7 @@ module OmniAuth
       # Resolves all conditions and returns true or false.
       def resolve_conditions(strategy_or_access_token, conditions = condition)
         #log :debug, "Resolve_conditions for data-method '#{name}' with conditions '#{conditions}'"
-        debug{"Resolve_conditions for data-method '#{name}' with conditions '#{conditions}'"}
+        debug{"for data-method '#{name}' with conditions '#{conditions}'"}
         return true unless conditions
         rslt = case conditions
           when Proc; strategy_or_access_token.instance_eval(&conditions)
@@ -444,7 +444,7 @@ module OmniAuth
           else conditions
         end ? true : false
         #log :debug, "Resolve_conditions for '#{name}' with '#{conditions}' result '#{rslt}'"
-        debug{"Resolve_conditions for '#{name}' with '#{conditions}' result '#{rslt}'"}
+        debug{"for data-method '#{name}' with '#{conditions}' result '#{rslt}'"}
         rslt
       end
       
@@ -455,10 +455,10 @@ module OmniAuth
           when NilClass; true
           when :empty?.to_proc; true
           when Array;
-            debug{"Resolve_scope array #{scopes}"}
+            debug{"array #{scopes}"}
             strategy_or_access_token.send(:has_scope?, *scopes)
           when Hash;
-            debug{"resolve_scope hash #{scopes}"}
+            debug{"hash #{scopes}"}
             strategy_or_access_token.send(:has_scope?, **scopes)
           else raise "Scope query object #{scopes} was not handled."
         end
