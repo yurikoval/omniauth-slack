@@ -172,7 +172,7 @@ module OmniAuth
           #   (env['omniauth.strategy'] && env['omniauth.strategy'].options && env['omniauth.strategy'].options.scope),
           scopes_requested: scopes_requested,
           web_hook_info: web_hook_info,
-          bot_info: access_token['bot'] || api_bots_info['bot'],
+          bot_info: access_token['bot'] || api_users_info['user'] || api_bots_info['bot'] ,
           access_token_hash: access_token.to_hash,
           #identity: @api_users_identity,
           #identity: access_token.instance_variable_get(:@api_users_identity) || user_token.instance_variable_get(:@api_users_identity),

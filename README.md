@@ -1,4 +1,4 @@
-⚠   **_WARNING_**: You are viewing the README of the MASTER branch of the GINJO fork of omniauth-slack. This document may refer to features not yet released.
+⚠   **_WARNING_**: You are viewing the README of the MASTER branch of the GINJO fork of omniauth-slack. This document may refer to features not yet released. Conversely (or maybe inversely), This branch may contain features  and changes not yet documented.
 
 To view current or previous releases:
 
