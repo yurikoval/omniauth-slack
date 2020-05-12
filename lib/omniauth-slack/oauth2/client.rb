@@ -18,36 +18,15 @@ module OmniAuth
           super
           self.logger = OmniAuth.logger
           self.history = {}
-          #options[:skip_token_validation] && skip_token_validation
         end
                 
         # Overrides OAuth2::Client#get_token to pass in the omniauth-slack AccessToken class.
         def get_token(params, access_token_opts = {}, access_token_class = OmniAuth::Slack::OAuth2::AccessToken) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+          debug{"params #{params}, access_token_opts #{access_token_opts}"}
           rslt = super(params, access_token_opts, access_token_class)
-          #debug{"Client #{self} built AccessToken #{rslt.to_yaml}"}
           debug{"Client #{self} built AccessToken #{rslt}"}
           rslt
         end
-        
-        # Slack's new v2 oauth get-token response does not follow the OAUTH2 spec,
-        # if only a user_scope was requested containing data in the team field.
-        #
-        # This is a temporary hack to make Slack's new v2 get-token response compatible
-        # with the Oauth2 gem (which enforces the OAUTH2 spec for get-token response.
-        #
-        # These have no effect in Oauth2 gem v1.4.4+
-        #
-        #   def response_contains_token
-        #     true
-        #   end
-        #
-        #   def skip_token_validation
-        #     debug{"defining :response_contains_token -> true"}
-        #     define_singleton_method :response_contains_token do
-        #       debug{"returning -> true"}
-        #       return true
-        #     end
-        #   end
         
         # Logs each API request and stores the API result in @history hash.
         # TODO: There should be some kind of option to disable this.

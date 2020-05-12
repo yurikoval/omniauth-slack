@@ -41,39 +41,15 @@ module OmniAuth
       debug{"#{self} setting up default options"}
       
       # Master list of authorization options handled by omniauth-slack.
-      AUTH_OPTIONS = %w(redirect_uri scope user_scope team team_domain )
+      # See below for redirect_uri.
+      AUTH_OPTIONS = %i(scope user_scope team team_domain)
       
       # Default strategy name.
       option :name, 'slack'
       
       # Options that can be passed with provider authorization URL.
-      option :authorize_options, AUTH_OPTIONS - %w(team_domain)
+      option :authorize_options, AUTH_OPTIONS - %i(team_domain)
       
-      # Options allowed to pass from omniauth /auth/<provider> URL
-      # to provider authorization URL.
-      option :pass_through_params, ['team']
-      
-      # TODO: Should this be in DataMethods module?
-      #       Maybe, since you almost always want a default of 0
-      #       and since the method is defined in DataMethods.
-      option :preload_data_with_threads, 0
-      
-      # Define additional data-methods to be called on
-      # successful authorization.
-      option :additional_data
-      
-      # Describes which data-methods are gated. Only these data-methods
-      # can be controlled by the :dependencies option.
-      # 
-      # This is generally not a setting that the user should be changing.
-      # The user should adjust the :dependencies option instead.
-      option :dependency_filter, /^api_/
-      
-      # Describes which data-methods are called and in what order.
-      # Gated data-methods that are ommitted from this list (by the user)
-      # will not be called.
-      option :dependencies
-
       # OAuth2::Client options.
       option :client_options, {
         site: 'https://slack.com',
@@ -90,6 +66,43 @@ module OmniAuth
         mode: :query,
         param_name: 'token'
       }
+
+
+      ###  Omniauth Slack custom options  ###
+      
+      # redirect_uri does not need to be in authorize_options,
+      # since it inserted anyway by omniauth-oauth2 during both
+      # the request (authorization) phase and the callback (get-token) phase.
+      # The magic of redirect_uri actually happens in the callback_url method.
+      option :redirect_uri
+      
+      # Options allowed to pass from omniauth /auth/<provider> URL
+      # to provider authorization URL.
+      option :pass_through_params, %i(team)
+      
+      # TODO: Should this be in DataMethods module?
+      #       Maybe, since you almost always want a default of 0
+      #       and since the method is defined in DataMethods.
+      option :preload_data_with_threads, 0
+      
+      # Define additional data-methods to be called on
+      # successful authorization.
+      #
+      # TODO: Should this be renamed 'get_additional_data' or maybe 'additional_data_methods' ?
+      option :additional_data
+      
+      # Describes which data-methods are gated. Only these data-methods
+      # can be controlled by the :dependencies option.
+      # 
+      # This is generally not a setting that the user should be changing.
+      # The user should adjust the :dependencies option instead.
+      option :dependency_filter, /^api_/
+      
+      # Describes which data-methods are called and in what order,
+      # upon a successful token response.
+      # Gated data-methods that are ommitted from this list (by the user)
+      # will not be called automatically (unless needed by this gem).
+      option :dependencies
 
 
       ###  Data  ###
@@ -134,7 +147,7 @@ module OmniAuth
           team_domain: team_domain,
           team_image: team_image,
           team_email_domain: team_email_domain,
-          bot_user_id: access_token['bot_user_id'],
+          bot_user_id: access_token.bot_user_id,
           nickname: nickname,
           image: image
         )
@@ -147,14 +160,14 @@ module OmniAuth
         #
         unless skip_info?
           %w(first_name last_name phone skype avatar_hash real_name real_name_normalized).each do |key|
-            hash[key.to_sym] = (
-              api_users_info['user'].to_h['profile'] ||
-              api_users_profile['profile']
+            hash[key.to_sym] ||= (
+              api_users_info.to_h['user'].to_h['profile'] ||
+              api_users_profile.to_h['profile']
             ).to_h[key]
           end
 
           %w(deleted status color tz tz_label tz_offset is_admin is_owner is_primary_owner is_restricted is_ultra_restricted is_bot has_2fa).each do |key|
-            hash[key.to_sym] = api_users_info['user'].to_h[key]
+            hash[key.to_sym] = api_users_info.to_h['user'].to_h[key]
           end
         end
         
@@ -172,14 +185,14 @@ module OmniAuth
           #   (env['omniauth.strategy'] && env['omniauth.strategy'].options && env['omniauth.strategy'].options.scope),
           scopes_requested: scopes_requested,
           web_hook_info: web_hook_info,
-          bot_info: access_token['bot'] || api_users_info['user'] || api_bots_info['bot'] ,
+          bot_info: access_token['bot'] || bot_user_info.to_h['user'],
           access_token_hash: access_token.to_hash,
           #identity: @api_users_identity,
           #identity: access_token.instance_variable_get(:@api_users_identity) || user_token.instance_variable_get(:@api_users_identity),
-          identity: api_users_identity,
-          user_info: @api_users_info,
-          user_profile: @api_users_profile,
-          team_info: @api_team_info,
+          identity: access_token.instance_variable_get(:@api_users_identity),
+          user_info: access_token.instance_variable_get(:@api_users_info),
+          user_profile: access_token.instance_variable_get(:@api_users_profile),
+          team_info: access_token.instance_variable_get(:@api_team_info),
           additional_data: get_additional_data,
           raw_info: raw_info
         }
@@ -244,7 +257,7 @@ module OmniAuth
       # Dropping query_string from callback_url prevents some errors in call to /api/oauth.[v2.]access.
       #
       def callback_url
-        full_host + script_name + callback_path
+        options.redirect_uri || full_host + script_name + callback_path
       end
 
       
@@ -367,84 +380,51 @@ module OmniAuth
         source(:api_users_info) { deep_find 'name' }
         source(:api_users_profile) { deep_find 'display_name' }
       end
-
-      # data_method :api_users_identity,
-      #   scope: {classic:'identity.basic', identity:'identity:read:user'},
-      #   storage: :api_users_identity,
-      #   condition: proc{ true },
-      #   default_value: {},
-      #   source: [
-      #     {name: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
-      #   ]
-
-      # data_method :api_users_identity,
-      #   #scope: {classic:'identity.basic', identity:'identity:read:user'},
-      #   storage: :api_users_identity,
-      #   condition: proc{ true },
-      #   default_value: {},
-      #   source: [
-      #     {name: 'user_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
-      #   ]
-      
-
-
-      ###  TODO: Move these API data methods to the AccessToken.  ###
-
-      data_method :api_users_info do
-        default_value AuthHash.new
-        scope classic: 'users:read', team: 'users:read'
-        source :access_token do
-          get('/api/users.info', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).to_auth_hash
-        end
-      end
-
-      data_method :api_users_profile do
-        default_value AuthHash.new
-        scope classic: 'users.profile:read', team: 'users.profile:read'
-        source :access_token do
-          get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).to_auth_hash
-        end
-      end      
-
-      data_method :api_team_info do
-        scope classic: 'team:read', team:'team:read'
-        default_value Hash.new
-        source :access_token do
-          get('/api/team.info').parsed
-        end
-      end
-      
-      data_method :api_bots_info do
-        scope classic: 'users:read', team: 'users:read'
-        #condition { !is_app_token? }
-        condition { ! access_token.token_type?('app') }
-        default_value Hash.new
-        source :access_token do
-          get('/api/bots.info').parsed
-        end
-      end
-      
-      # API call to get user permissions for workspace token.
-      # This used to be needed, but its functionality is now in AcessToken.
-      #
-      # Returns [<id>: <resource>]
-      #      
-      # data_method :api_apps_permissions_users_list do
-      #   default_value {}
-      #   condition proc { is_app_token? }
-      #   source :access_token, 'apps_permissions_users_list(user_id)'
-      # end
       
       
       def api_users_identity
         #access_token.user_token.api_users_identity
-        if access_token['token_type'].to_s == 'user'
+        if access_token.token_type?('user', 'app')
           access_token.api_users_identity
-        elsif access_token['token_type'].to_s == '' && access_token.user_token
-          access_token.user_token.api_users_identity
+        elsif access_token.token_type.to_s.empty? && user_token
+          user_token.api_users_identity
         else
-          {}
+          #{}
         end
+      end
+      
+      def api_users_info
+        if access_token.token_type?('user', 'app')
+          access_token.api_users_info
+        elsif access_token.token_type.to_s.empty? && user_token
+          user_token.api_users_info
+        else
+          #{}
+        end
+      end
+      
+      def api_users_profile
+        if access_token.token_type?('user', 'app')
+          access_token.api_users_profile
+        elsif access_token.token_type.to_s.empty? && user_token
+          user_token.api_users_profile
+        else
+          #{}
+        end
+      end
+      
+      def bot_user_info
+        if access_token.bot_user_id
+          access_token.api_users_info(access_token.bot_user_id)
+        end
+      end
+      
+      def api_team_info
+        access_token.api_team_info
+      end
+      
+      def api_bots_info
+        access_token.api_bots_info
       end
 
       # This hash is handed to the access-token (or is it the AuthHash?), which in turn fills it with API response objects.
@@ -480,7 +460,8 @@ module OmniAuth
       # TODO: Should this be left up the user, or even removed entirely.
       # How would users specify where their data-methods are being defined/attached?
       #
-      data_methods.each{|k,v| OmniAuth::Slack::OAuth2::AccessToken.data_method(k, v) if k.to_s[default_options.dependency_filter]}
+      # Disabled since we moved the api data-methods to AccessToken class.
+      #data_methods.each{|k,v| OmniAuth::Slack::OAuth2::AccessToken.data_method(k, v) if k.to_s[default_options.dependency_filter]}
       
     end # Slack
   end # Strategies

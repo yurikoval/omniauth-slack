@@ -207,8 +207,8 @@ module OmniAuth
           
           data_methods[name] = DataMethod.new(name, self, default_val, opts, &blk)
                     
-          define_method(name) do
-            semaphore(name).synchronize { data_methods[__method__].call(self) }
+          define_method(name) do |*method_args|
+            semaphore(name).synchronize { data_methods[__method__].call(self, *method_args) }
           end
                     
           data_methods[name]
@@ -464,16 +464,17 @@ module OmniAuth
         end
       end
       
-      # Resolves a single source definition.
-      def resolve_source(src, strategy_or_access_token)
+      # Resolves a single source definition. This is where the body of the method code is run.
+      def resolve_source(src, strategy_or_access_token, *method_args)
         source_target = src.respond_to?(:name) ? src.name : strategy_or_access_token
         source_code = case
-          when src.respond_to?(:code);src.code
+          when src.respond_to?(:code); src.code
           when src.is_a?(Proc); src
           else proc{self}
         end
         #log :debug, "'#{name}' calling source_target '#{source_target}' on klass_instance '#{strategy_or_access_token}' with code '#{source_code}'."
         #debug{"'#{name}' calling source_target '#{source_target}' on klass_instance '#{strategy_or_access_token}' with code '#{source_code}'."}
+        #puts "resolve_source :#{name}, method_args: #{method_args}"
         
         target_result = case source_target
           when 'default'
@@ -485,7 +486,7 @@ module OmniAuth
           when Symbol
             strategy_or_access_token.send(source_target)
           when Proc
-            strategy_or_access_token.instance_eval(&source_target)
+            strategy_or_access_token.instance_exec(&source_target)
           else
             source_target
         end
@@ -495,7 +496,7 @@ module OmniAuth
         if target_result
           case source_code
             when Proc
-              target_result.instance_eval(&source_code)
+              target_result.instance_exec(*method_args, &source_code)
             when String
               target_result.send(:eval, source_code)
             when Array
@@ -556,13 +557,13 @@ module OmniAuth
       end
       
       # Processes this DataMethod in the context of the given strategy-or-access-token instance.
-      def call(strategy_or_access_token)
+      def call(strategy_or_access_token, *method_args)
         with_cache(strategy_or_access_token) do
           result = nil
           resolve_scope(strategy_or_access_token) &&
           resolve_conditions(strategy_or_access_token) &&
           select_sources(strategy_or_access_token).each do |src|
-            result = resolve_source(src, strategy_or_access_token)
+            result = resolve_source(src, strategy_or_access_token, *method_args)
             break if result
           end
           

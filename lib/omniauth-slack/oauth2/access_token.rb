@@ -34,6 +34,7 @@ require 'omniauth-slack/debug'
 module OmniAuth
   module Slack
     using StringRefinements
+    using OAuth2Refinements
     
     module OAuth2
       # Enhanced subclass of OAuth2::AccessToken, used by OmniAuth::Slack
@@ -55,11 +56,17 @@ module OmniAuth
         end
         
         def token_type
-          params['token_type']
+          params['token_type'] ||
+          case
+            when params['access_token'].to_s[/xoxp/]; 'user'
+            when params['access_token'].to_s[/xoxb/]; 'bot'
+            when params['access_token'].to_s[/xoxa/]; 'app'
+            when params['access_token'].to_s[/xoxr/]; 'refresh'
+          end
         end
         
-        def token_type?(_type)
-          debug{"'#{_type}'"}
+        def token_type?(*_type)
+          #debug{"'#{_type}'"}
           [_type].flatten.any? do |t|
             token_type.to_s == t.to_s
           end
@@ -69,13 +76,16 @@ module OmniAuth
         # Use this to call API methods from a user-token.
         def user_token
           @user_token ||= (
-            if params['token_type'] == 'user'
+            if token_type?('user')
               self
             elsif params['authed_user']
-              self.class.from_hash(client, params['authed_user']) 
+              rslt = self.class.from_hash(client, params['authed_user']).tap do |t|
+                t.params['token_type'] = 'user'
+              end
             end
           )
         end
+        alias_method :authed_user, :user_token
 
         # Creates simple getter methods to pull specific data from params.
         %w(user_name user_email team_id team_name team_domain).each do |word|
@@ -88,50 +98,33 @@ module OmniAuth
 
         # Cannonical AccessToken user_id.
         def user_id
-          params['bot_user_id'] ||
+          # classic token.
           params['user_id'] ||
+          # v2 api bot token.
+          params['bot_user_id'] ||
+          # user-token from authed_user hash.
+          params['id'] ||
+          # workspace-app token with attached user.
           params['user'].to_h['id'] ||
+          # workspace-app token.
           params['authorizing_user'].to_h['user_id'] ||
-          # This will pull from the sub-token 'authed_user' if no user_id found yet.
-          params['authed_user'].to_h['id'] ||
-          params['id']
+          # if still no id found, pull from the sub-token 'authed_user'.
+          params['authed_user'].to_h['id']
+        end
+        
+        def bot_user_id
+          params['bot_user_id']
         end
         
         # Cannonical AccessToken unique user-team-id combo.
         def uid
           "#{user_id}-#{team_id}"
         end
-      
-        # Is this a workspace app (or bot) token?
-        #
-        # Returns nil if unknown
-        # def is_app_token?
-        #   case
-        #     #when params['token_type'] == 'app' || token.to_s[/^xoxa/]
-        #     when token_type?('app') || token.to_s[/^xoxa/]
-        #       true
-        #     when params['token_type'] == 'bot' || token.to_s[/^xoxb/]
-        #       true
-        #     when token.to_s[/^xoxp/]
-        #       false
-        #     else
-        #       nil
-        #   end
-        # end
         
-        # Is this a token returned from an identity-scoped request?
-        # TODO: Deprecated, use token_type?(...) instead.
-        def is_identity_token?
-          (
-          token.to_s[/^xoxp/] ||
-          params['user_id'] ||
-          params['user'].to_h['id'] #||
-          #params['authed_user'].to_h['id']
-          ) && true || false
-        end
+        def bot_uid
+          bot_user_id ? "#{bot_user_id}-#{team_id}" : nil
+        end  
         
-        
-        # Experimental data-method in AccessToken instead of in strategy (Slack).
         data_method :api_users_identity,
           scope: {classic:'identity.basic', identity:'identity:read:user'},
           storage: :api_users_identity,
@@ -141,6 +134,42 @@ module OmniAuth
           source: [
             {name: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
           ]
+                    
+        data_method :api_users_info do
+          default_value AuthHash.new
+          scope classic: 'users:read', team: 'users:read'
+          source :access_token do |*args|
+            puts "api_users_info args[0]: #{args[0]}"
+            get('/api/users.info', params: {user: (args[0] || user_id)}, headers: {'X-Slack-User' => (args[0] || user_id)}).to_auth_hash
+          end
+        end
+  
+        data_method :api_users_profile do
+          default_value AuthHash.new
+          scope classic: 'users.profile:read', team: 'users.profile:read'
+          source :access_token do
+            get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).to_auth_hash
+          end
+        end      
+  
+        data_method :api_team_info do
+          scope classic: 'team:read', team:'team:read'
+          default_value Hash.new
+          source :access_token do
+            get('/api/team.info').parsed
+          end
+        end
+        
+        # Info about bots on the token's team, NOT info about a bot token from v2 API.
+        data_method :api_bots_info do
+          scope classic: 'users:read', team: 'users:read'
+          #condition { !is_app_token? }
+          condition { ! token_type?('app') }
+          default_value Hash.new
+          source :access_token do
+            get('/api/bots.info').parsed
+          end
+        end
         
       
         # Identity scopes (workspace apps only).
@@ -192,7 +221,7 @@ module OmniAuth
         # and *value* is Array of scopes.
         #
         def all_scopes(_user_id=nil)
-          debug{"_user_id: #{_user_id}, @all_scopes: #{@all_scopes}"}
+          #debug{"_user_id: #{_user_id}, @all_scopes: #{@all_scopes}"}
           if _user_id && !@all_scopes.to_h.has_key?('identity') || @all_scopes.nil?
             
             @all_scopes = (
@@ -222,7 +251,7 @@ module OmniAuth
             @all_scopes
           end
           
-          debug{"generated #{@all_scopes}"}
+          #debug{"generated #{@all_scopes}"}
           @all_scopes
         end
         
