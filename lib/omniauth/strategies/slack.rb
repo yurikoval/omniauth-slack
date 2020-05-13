@@ -112,17 +112,17 @@ module OmniAuth
       # to be globally unique.
       #
       #uid { "#{user_id}-#{team_id}" }
-      uid { access_token.uid }
+      uid { access_or_user_token&.uid }
 
 
       # Gathers access_token and awarded scopes for :credentials section of AuthHash.
       #
       credentials do
         {
-          token_type: access_token['token_type'] || user_token&.[]('token_type'),
-          scope: access_token['scope'] || user_token&.[]('scope'),
-          scopes: access_token.all_scopes || user_token&.all_scopes,
-          token: access_token.token || user_token&.token
+          token_type: access_or_user_token&.token_type,
+          scope: access_or_user_token&.scope,
+          scopes: access_or_user_token&.all_scopes,
+          token: access_or_user_token&.token
         }
       end
 
@@ -147,7 +147,7 @@ module OmniAuth
           team_domain: team_domain,
           team_image: team_image,
           team_email_domain: team_email_domain,
-          bot_user_id: access_token.bot_user_id,
+          bot_user_id: access_token&.bot_user_id,
           nickname: nickname,
           image: image
         )
@@ -188,11 +188,10 @@ module OmniAuth
           bot_info: access_token['bot'] || bot_user_info.to_h['user'],
           access_token_hash: access_token.to_hash,
           #identity: @api_users_identity,
-          #identity: access_token.instance_variable_get(:@api_users_identity) || user_token.instance_variable_get(:@api_users_identity),
-          identity: access_token.instance_variable_get(:@api_users_identity),
-          user_info: access_token.instance_variable_get(:@api_users_info),
-          user_profile: access_token.instance_variable_get(:@api_users_profile),
-          team_info: access_token.instance_variable_get(:@api_team_info),
+          identity: access_or_user_token.instance_variable_get(:@api_users_identity),
+          user_info: access_or_user_token.instance_variable_get(:@api_users_info),
+          user_profile: access_or_user_token.instance_variable_get(:@api_users_profile),
+          team_info: access_or_user_token.instance_variable_get(:@api_team_info),
           additional_data: get_additional_data,
           raw_info: raw_info
         }
@@ -294,13 +293,13 @@ module OmniAuth
 
       def user_id
         # access_token['user_id'] || access_token['user'].to_h['id'] || access_token['authorizing_user'].to_h['user_id']
-        access_token.user_id
+        access_or_user_token&.user_id
       end
 
       
       def team_id
         # access_token['team_id'] || access_token['team'].to_h['id']
-        access_token.team_id
+        access_or_user_token&.team_id
       end
 
       
@@ -329,40 +328,40 @@ module OmniAuth
       # See data_methods.rb for available DSL methods.
                     
       data_method :user_name, info_key: 'name', storage: :user_name, source: [
-        {name: 'access_token', code: 'user_name'},
+        {name: 'access_or_user_token', code: 'user_name'},
         {name: 'api_users_identity', code: "self['user'].to_h.fetch('name',nil)"},
         {name: 'api_users_info', code: "fetch('user',{}).to_h['real_name']"},
         {name: 'api_users_profile', code: "fetch('profile',{}).to_h['real_name']"}
       ]
       
       data_method :user_email, info_key: 'email', storage: :user_email, source: [
-        {name: 'access_token', code: "user_email"},
+        {name: 'access_or_user_token', code: "user_email"},
         {name: 'api_users_identity', code: "self['user'].to_h.fetch('email',nil)"},
         {name: 'api_users_info', code: "fetch('user',{}).to_h['profile'].to_h['email']"},
         {name: 'api_users_profile', code: "fetch('profile',{}).to_h['email']"}
       ]
       
       data_method :image do
-        source(:access_token) { self['user'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
+        source(:access_or_user_token) { self['user'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
         source(:api_users_identity){ self['user'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
         source(:api_users_info) { self['user'].to_h['profile'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
         source(:api_users_profile) { self['profile'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
       end
       
       data_method :team_name do
-        source(:access_token) { team_name }
+        source(:access_or_user_token) { team_name }
         source(:api_users_identity){ self['team'].to_h['name'] }
         source(:api_team_info) { self['team'].to_h['name'] }
       end
       
       data_method :team_domain do
-        source(:access_token) { self['team'].to_h['domain'] }
+        source(:access_or_user_token) { self['team'].to_h['domain'] }
         source(:api_users_identity) { self['team'].to_h['domain'] }
         source(:api_team_info) { self['team'].to_h['domain'] }
       end
       
       data_method :team_image do
-        source(:access_token) { self['team'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
+        source(:access_or_user_token) { self['team'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
         source(:api_users_identity) { self['team'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
         source(:api_team_info) { self['team'].to_h['icon'].to_h.find{|k,v| k.to_s[/image_/]}.to_a[1] }
       end
@@ -383,48 +382,51 @@ module OmniAuth
       
       
       def api_users_identity
-        #access_token.user_token.api_users_identity
-        if access_token.token_type?('user', 'app')
-          access_token.api_users_identity
-        elsif access_token.token_type.to_s.empty? && user_token
-          user_token.api_users_identity
-        else
-          #{}
-        end
+        #   #access_token.user_token.api_users_identity
+        #   if access_token.token_type?('user', 'app')
+        #     access_token.api_users_identity
+        #   elsif access_token.token_type.to_s.empty? && user_token
+        #     user_token.api_users_identity
+        #   else
+        #     #{}
+        #   end
+        access_or_user_token&.api_users_identity
       end
       
       def api_users_info
-        if access_token.token_type?('user', 'app')
-          access_token.api_users_info
-        elsif access_token.token_type.to_s.empty? && user_token
-          user_token.api_users_info
-        else
-          #{}
-        end
+        #   if access_token.token_type?('user', 'app')
+        #     access_token.api_users_info
+        #   elsif access_token.token_type.to_s.empty? && user_token
+        #     user_token.api_users_info
+        #   else
+        #     #{}
+        #   end
+        access_or_user_token&.api_users_info
       end
       
       def api_users_profile
-        if access_token.token_type?('user', 'app')
-          access_token.api_users_profile
-        elsif access_token.token_type.to_s.empty? && user_token
-          user_token.api_users_profile
-        else
-          #{}
-        end
+        #   if access_token.token_type?('user', 'app')
+        #     access_token.api_users_profile
+        #   elsif access_token.token_type.to_s.empty? && user_token
+        #     user_token.api_users_profile
+        #   else
+        #     #{}
+        #   end
+        access_or_user_token&.api_users_profile
       end
       
       def bot_user_info
-        if access_token.bot_user_id
+        if access_token&.bot_user_id
           access_token.api_users_info(access_token.bot_user_id)
         end
       end
       
       def api_team_info
-        access_token.api_team_info
+        access_token&.api_team_info
       end
       
       def api_bots_info
-        access_token.api_bots_info
+        access_token&.api_bots_info
       end
 
       # This hash is handed to the access-token (or is it the AuthHash?), which in turn fills it with API response objects.
@@ -436,7 +438,19 @@ module OmniAuth
       # Gets 'authed_user' sub-token from main access token.
       #
       def user_token
-        access_token.user_token
+        access_token&.user_token
+      end
+      
+      # Gets main access_token, if valid, otherwise gets user_token, if valid.
+      # Handles Slack v1 and v2 API (v2 is non-conformant with OAUTH2 spec).
+      def access_or_user_token
+        if access_token&.token
+          access_token
+        elsif user_token
+          user_token
+        else
+          access_token
+        end
       end
 
       # Is this a workspace app token?
@@ -452,8 +466,9 @@ module OmniAuth
         env['omniauth.authorize_params'].to_h['scope']
       end
 
+      # Convenience method for user.
       def has_scope?(*args)
-        access_token.has_scope?(*args)
+        access_or_user_token.has_scope?(*args)
       end
       
       # Copies the api_* data-methods to AccessToken.

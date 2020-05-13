@@ -88,7 +88,7 @@ module OmniAuth
         alias_method :authed_user, :user_token
 
         # Creates simple getter methods to pull specific data from params.
-        %w(user_name user_email team_id team_name team_domain).each do |word|
+        %w(user_name user_email team_id team_name team_domain scope).each do |word|
           obj, atrb = word.split('_')
           define_method(word) do
             params[word] ||
@@ -102,14 +102,16 @@ module OmniAuth
           params['user_id'] ||
           # v2 api bot token.
           params['bot_user_id'] ||
-          # user-token from authed_user hash.
+          # user-id from authed_user hash.
           params['id'] ||
           # workspace-app token with attached user.
           params['user'].to_h['id'] ||
-          # workspace-app token.
-          params['authorizing_user'].to_h['user_id'] ||
+          # workspace-app token with authorizing user.
+          params['authorizing_user'].to_h['user_id'] #||
           # if still no id found, pull from the sub-token 'authed_user'.
-          params['authed_user'].to_h['id']
+          # TODO: I don't think we should do this, since it will be out
+          # of sync with the other methods and data on this token instance.
+          #params['authed_user'].to_h['id']
         end
         
         def bot_user_id
