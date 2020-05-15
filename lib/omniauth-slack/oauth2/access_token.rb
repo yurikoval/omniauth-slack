@@ -146,11 +146,11 @@ module OmniAuth
           scope: {classic:'identity.basic', identity:'identity:read:user'},
           storage: :api_users_identity,
           #condition: proc{ true },
-          condition: proc{ token_type? 'user' },
+          #condition: proc{ token_type? 'user' },
           condition: proc{ person_user_id },
           default_value: {},
           source: [
-            {name: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
+            {name: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => person_user_id}).parsed }}
           ]
                     
         data_method :api_users_info do
