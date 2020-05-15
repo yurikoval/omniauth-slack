@@ -17,7 +17,7 @@ module OmniAuth
           debug{"args: #{args}"}
           super
           self.logger = OmniAuth.logger
-          self.history = {}
+          self.history = []  #{}
         end
                 
         # Overrides OAuth2::Client#get_token to pass in the omniauth-slack AccessToken class.
@@ -35,7 +35,8 @@ module OmniAuth
           debug{"API request args #{args}"}
           request_output = super(*args)
           uri = args[1].to_s.gsub(/^.*\/([^\/]+)/, '\1') # use single-quote or double-back-slash for replacement.
-          history[uri.to_s] = request_output
+          #history["#{uri.to_s}_#{Time.now.to_i}"] = request_output
+          history << {api_call: uri.to_s, time: Time.now, response: request_output}
           #debug{"API response (#{args[0..1]}) #{request_output.class}"}
           debug{"API response #{request_output.response.env.body}"}
           request_output

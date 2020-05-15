@@ -92,11 +92,11 @@ module OmniAuth
           obj, atrb = word.split('_')
           define_method(word) do
             params[word] ||
-            params[obj].to_h[atrb] #||
+            params && params[obj] && params[obj][atrb]
           end
         end
 
-        # Cannonical AccessToken user_id.
+        # AccessToken user_id.
         def user_id
           # classic token.
           params['user_id'] ||
@@ -114,24 +114,40 @@ module OmniAuth
           #params['authed_user'].to_h['id']
         end
         
+        # AccessToken unique user-team-id combo.
+        # Only works for main token, since sub-tokens don't have team id's.
+        def uid
+          _uid = ((user_id || user_token&.user_id) && team_id) ? "#{(user_id || user_token&.user_id)}-#{team_id}" : nil
+          debug { _uid }
+          _uid
+        end
+        
         def bot_user_id
           params['bot_user_id']
         end
         
-        # Cannonical AccessToken unique user-team-id combo.
-        def uid
-          "#{user_id}-#{team_id}"
+        def bot_uid
+          bot_user_id && team_id ? "#{bot_user_id}-#{team_id}" : nil
+        end  
+        
+        def person_user_id
+          case
+            when user_token; user_token&.user_id
+            when user_id.to_s[/U0B/]; user_id
+          end
         end
         
-        def bot_uid
-          bot_user_id ? "#{bot_user_id}-#{team_id}" : nil
-        end  
+        def person_uid
+          person_user_id && team_id ? "#{person_user_id}-#{team_id}" : nil
+        end
+
         
         data_method :api_users_identity,
           scope: {classic:'identity.basic', identity:'identity:read:user'},
           storage: :api_users_identity,
           #condition: proc{ true },
           condition: proc{ token_type? 'user' },
+          condition: proc{ person_user_id },
           default_value: {},
           source: [
             {name: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => user_id}).parsed }}
@@ -140,8 +156,9 @@ module OmniAuth
         data_method :api_users_info do
           default_value AuthHash.new
           scope classic: 'users:read', team: 'users:read'
+          condition { user_id }
           source :access_token do |*args|
-            puts "api_users_info args[0]: #{args[0]}"
+            debug{ "api_users_info args[0]: #{args[0]}" }
             get('/api/users.info', params: {user: (args[0] || user_id)}, headers: {'X-Slack-User' => (args[0] || user_id)}).to_auth_hash
           end
         end
@@ -149,6 +166,7 @@ module OmniAuth
         data_method :api_users_profile do
           default_value AuthHash.new
           scope classic: 'users.profile:read', team: 'users.profile:read'
+          condition { user_id }
           source :access_token do
             get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).to_auth_hash
           end
@@ -173,13 +191,14 @@ module OmniAuth
           end
         end
         
-      
         # Identity scopes (workspace apps only).
         # Given _user_id, returns specific identity scopes.
         #
         # Sets @apps_permissions_users_list with parsed API response.
         #
         # _user_id  - String of Slack user ID.
+        #
+        # TODO: Can this be converted to a data-method?
         #
         def apps_permissions_users_list(_user_id=nil)
           #raise StandardError, "APUL caller #{caller_method_name} user #{_user_id}"

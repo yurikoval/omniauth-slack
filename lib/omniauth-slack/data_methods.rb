@@ -207,8 +207,8 @@ module OmniAuth
           
           data_methods[name] = DataMethod.new(name, self, default_val, opts, &blk)
                     
-          define_method(name) do |*method_args|
-            semaphore(name).synchronize { data_methods[__method__].call(self, *method_args) }
+          define_method(name) do |*method_args, **call_options|
+            semaphore(name).synchronize { data_methods[__method__].call(self, *method_args, **call_options) }
           end
                     
           data_methods[name]
@@ -328,7 +328,7 @@ module OmniAuth
       #
       def source(*args) # (optional-name, optional-proc, optional-opts, &optional-block)
         #return self[__method__] unless args.any?
-        return source_array unless args.any?
+        return source_array unless (args.any? || block_given?)
         opts = args.last.is_a?(Hash) ? args.pop : Hashy.new
         source_name = args.shift if [String, Symbol].any?{|t| args[0].is_a?(t)}
         code = case
@@ -541,24 +541,26 @@ module OmniAuth
       end
       
       # Wraps a memoization-with-ivar around a given block.
-      def with_cache(strategy_or_access_token, &block)
+      def with_cache(strategy_or_access_token, call_options, &block)
         storage_name = case storage
           when false; false
           when nil; name
           when storage; storage
         end
-        if storage_name
+        if storage_name && call_options[:read_cache]!=false
           ivar_data = strategy_or_access_token.instance_variable_get("@#{storage_name}")
           return ivar_data if ivar_data
         end
         result = yield
-        strategy_or_access_token.instance_variable_set("@#{storage_name}", result) if result && storage_name
+        if result && storage_name && call_options[:write_cache]!=false
+          strategy_or_access_token.instance_variable_set("@#{storage_name}", result)
+        end
         result
       end
       
       # Processes this DataMethod in the context of the given strategy-or-access-token instance.
-      def call(strategy_or_access_token, *method_args)
-        with_cache(strategy_or_access_token) do
+      def call(strategy_or_access_token, *method_args, **call_options)
+        with_cache(strategy_or_access_token, call_options) do
           result = nil
           resolve_scope(strategy_or_access_token) &&
           resolve_conditions(strategy_or_access_token) &&

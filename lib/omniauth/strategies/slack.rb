@@ -112,7 +112,7 @@ module OmniAuth
       # to be globally unique.
       #
       #uid { "#{user_id}-#{team_id}" }
-      uid { access_or_user_token&.uid }
+      uid { access_token&.uid }
 
 
       # Gathers access_token and awarded scopes for :credentials section of AuthHash.
@@ -181,15 +181,14 @@ module OmniAuth
       extra do
         {
           #authed_user: access_token['authed_user'].to_h,
-          # scopes_requested: (env['omniauth.params'] && env['omniauth.params']['scope']) || \
-          #   (env['omniauth.strategy'] && env['omniauth.strategy'].options && env['omniauth.strategy'].options.scope),
           scopes_requested: scopes_requested,
           web_hook_info: web_hook_info,
-          bot_info: access_token['bot'] || bot_user_info.to_h['user'],
+          bot_info: access_token['bot'] || (!skip_info? && bot_user_info || nil),
           access_token_hash: access_token.to_hash,
           #identity: @api_users_identity,
           identity: access_or_user_token.instance_variable_get(:@api_users_identity),
-          user_info: access_or_user_token.instance_variable_get(:@api_users_info),
+          #user_info: access_or_user_token.instance_variable_get(:@api_users_info),
+          user_info: (!skip_info? && person_user_info || nil),
           user_profile: access_or_user_token.instance_variable_get(:@api_users_profile),
           team_info: access_or_user_token.instance_variable_get(:@api_team_info),
           additional_data: get_additional_data,
@@ -197,7 +196,6 @@ module OmniAuth
         }
       end
       
-
       # Overrides OmniAuth::Oauth2#authorize_params so that
       # specified params can be passed on to Slack authorization GET request.
       # See https://github.com/omniauth/omniauth/issues/390
@@ -212,7 +210,6 @@ module OmniAuth
         end
       end
       
-      
       # Overrides OmniAuth callback phase to extract session var
       # for omniauth.authorize_params into env (this is how omniauth does this).
       def callback_phase #(*args)
@@ -224,7 +221,6 @@ module OmniAuth
         
         result = super
       end
-      
       
       # Overrides OmniAuth::Strategies::OAuth2#client to define custom behavior.
       #
@@ -252,7 +248,6 @@ module OmniAuth
         new_client
       end
 
-
       # Dropping query_string from callback_url prevents some errors in call to /api/oauth.[v2.]access.
       #
       def callback_url
@@ -261,6 +256,15 @@ module OmniAuth
 
       
       private
+      
+      def user_id
+        # access_token['user_id'] || access_token['user'].to_h['id'] || access_token['authorizing_user'].to_h['user_id']
+        access_or_user_token&.user_id
+      end
+
+      def team_id
+        access_token&.team_id
+      end
       
       # Gets and decodes :pass_through_params option.
       #
@@ -276,7 +280,6 @@ module OmniAuth
         end
       end
       
-      
       # Runs/calls/compiles results from additional_data definitions.
       #
       def get_additional_data
@@ -289,19 +292,6 @@ module OmniAuth
           end
         end
       end
-
-
-      def user_id
-        # access_token['user_id'] || access_token['user'].to_h['id'] || access_token['authorizing_user'].to_h['user_id']
-        access_or_user_token&.user_id
-      end
-
-      
-      def team_id
-        # access_token['team_id'] || access_token['team'].to_h['id']
-        access_or_user_token&.team_id
-      end
-
       
       # Parsed data returned from /slack/oauth.[v2.]access api call.
       #
@@ -314,7 +304,6 @@ module OmniAuth
         #@auth ||= access_token.params.to_h.merge({'token' => access_token.token})
         @auth ||= access_token.to_hash
       end
-
 
       def web_hook_info
         #return {} unless access_token.key? 'incoming_webhook'
@@ -382,42 +371,31 @@ module OmniAuth
       
       
       def api_users_identity
-        #   #access_token.user_token.api_users_identity
-        #   if access_token.token_type?('user', 'app')
-        #     access_token.api_users_identity
-        #   elsif access_token.token_type.to_s.empty? && user_token
-        #     user_token.api_users_identity
-        #   else
-        #     #{}
-        #   end
         access_or_user_token&.api_users_identity
       end
       
       def api_users_info
-        #   if access_token.token_type?('user', 'app')
-        #     access_token.api_users_info
-        #   elsif access_token.token_type.to_s.empty? && user_token
-        #     user_token.api_users_info
-        #   else
-        #     #{}
-        #   end
         access_or_user_token&.api_users_info
       end
       
       def api_users_profile
-        #   if access_token.token_type?('user', 'app')
-        #     access_token.api_users_profile
-        #   elsif access_token.token_type.to_s.empty? && user_token
-        #     user_token.api_users_profile
-        #   else
-        #     #{}
-        #   end
         access_or_user_token&.api_users_profile
       end
       
       def bot_user_info
+        @bot_user_info ||=
         if access_token&.bot_user_id
-          access_token.api_users_info(access_token.bot_user_id)
+          access_token.api_users_info(access_token.bot_user_id).to_h['user']
+          #access_token&.bot_user_info.to_h['user']
+        end
+      end
+      
+      def person_user_info
+        @person_user_info ||=
+        if user_token&.api_users_info&.any?
+          user_token.api_users_info
+        elsif access_token&.person_user_id
+          access_token.api_users_info(access_token.person_user_id, read_cache:false, write_cache:false)
         end
       end
       
@@ -432,7 +410,7 @@ module OmniAuth
       # This hash is handed to the access-token (or is it the AuthHash?), which in turn fills it with API response objects.
       #
       def raw_info
-        @raw_info ||= {}
+        @raw_info ||= []
       end
       
       # Gets 'authed_user' sub-token from main access token.
@@ -452,18 +430,14 @@ module OmniAuth
           access_token
         end
       end
-
-      # Is this a workspace app token?
-      #
-      # Deprecated!
-      #
-      # def is_app_token?
-      #   access_token.is_app_token?
-      # end
       
       def scopes_requested
         # omniauth.authorize_params is a custom enhancement to omniauth for omniauth-slack.
-        env['omniauth.authorize_params'].to_h['scope']
+        out = env['omniauth.authorize_params'].to_h['scope'] ||
+              env['omniauth.authorize_params'].to_h['user_scope']
+        
+        debug{"scopes_requested: #{out}"}
+        return out
       end
 
       # Convenience method for user.
