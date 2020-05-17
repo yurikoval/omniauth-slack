@@ -111,7 +111,8 @@ module OmniAuth
       end # info
 
 
-      # Gathers additiona API calls, user-defined additional_data_method responses, and raw Slack API responses,
+      # Gathers additiona API calls, user-defined additional_data_method responses,
+      # and raw Slack API responses,
       # for :extra section of AuthHash.
       #
       extra do
@@ -138,22 +139,18 @@ module OmniAuth
       # Overrides OmniAuth callback phase to extract session var
       # for omniauth.authorize_params into env (this is how omniauth does this).
       def callback_phase #(*args)
-        # This technique copied from OmniAuth::Strategy (this is how they do it for the other omniauth objects).
+        # This technique copied from OmniAuth::Strategy,
+        # (this is how they do it for the other omniauth objects).
         env['omniauth.authorize_params'] = session.delete('omniauth.authorize_params')
-                
-        #   # This is trying to help move additiona_data definition away from user-action.
-        #   self.class.define_additional_data(options.additional_data)
-        
-        result = super
+        super
       end
       
-      # Overrides OmniAuth::Strategies::OAuth2#client to define custom behavior.
+      # Overrides OmniAuth::Strategies::OAuth2#client to handle Slack-specific features.
       #
       # * Logs API requests with OmniAuth.logger.
-      # * Adds API responses to @raw_info hash.
-      # * Sets auth site uri with custom subdomain (if provided).
+      # * Allows passthrough of Slack team_domain.
       #
-      # Returns instance of custom OmniAuth::Slack::OAuth2::Client.
+      # Returns instance of OmniAuth::Slack::OAuth2::Client.
       #
       def client
         #new_client = super
@@ -168,15 +165,13 @@ module OmniAuth
         # Activates Client request history for this client instance.
         new_client.history = Array.new
         
-        #   # Put the raw_info in a place where the Client will update it for each API request.
-        #   new_client.history = raw_info
-        
-        debug{"Strategy #{self} using Client #{new_client}"}
+        debug{"Strategy #{self} using Client #{new_client} with callback_url #{callback_url}"}
         
         new_client
       end
 
-      # Dropping query_string from callback_url prevents some errors in call to /api/oauth.[v2.]access.
+      # Dropping query_string from the default OmniAuth callback_url prevents
+      # some errors in call to /api/oauth.[v2.]access.
       #
       def callback_url
         options.redirect_uri || full_host + script_name + callback_path
@@ -257,11 +252,6 @@ module OmniAuth
         return out
       end
 
-      # Convenience method for user.
-      def has_scope?(*args)
-        access_or_user_token.has_scope?(*args)
-      end
-      
     end # Slack
   end # Strategies
 end # OmniAuth
