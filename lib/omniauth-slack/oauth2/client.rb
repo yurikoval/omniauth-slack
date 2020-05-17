@@ -79,27 +79,6 @@ module OmniAuth
             super
           end
         end
-
-        #   ### No longer needed, since we no longer have client-option :flow_version.
-        #
-        #   # Overrides #authorize_url to handle a proc (allowing influence from flow_version).
-        #   def authorize_url(*args)
-        #     debug{"authorize_url args: #{args}"}
-        #     debug{"authorize_url options: #{options}"}
-        #     if options[:authorize_url].is_a?(Proc)
-        #       options[:authorize_url] = instance_eval &(options[:authorize_url])
-        #     end
-        #     debug{"authorize_url resolved: #{options[:authorize_url]}"}
-        #     super
-        #   end
-        #   
-        #   # Overrides #token_url to handle a proc (allowing influence from flow_version).
-        #   def token_url(*args)
-        #     if options[:token_url].is_a?(Proc)
-        #       options[:token_url] = instance_eval &(options[:token_url])
-        #     end
-        #     super
-        #   end
         
       end
     end

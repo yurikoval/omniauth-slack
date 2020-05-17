@@ -106,9 +106,9 @@ module OmniAuth
       #     end
       #   end
       #
-      info do        
+      info do   
         access_token.to_hash
-      end # info
+      end
 
 
       # Gathers additiona API calls, user-defined additional_data_method responses,
@@ -138,6 +138,7 @@ module OmniAuth
       
       # Overrides OmniAuth callback phase to extract session var
       # for omniauth.authorize_params into env (this is how omniauth does this).
+      #
       def callback_phase #(*args)
         # This technique copied from OmniAuth::Strategy,
         # (this is how they do it for the other omniauth objects).
@@ -152,9 +153,7 @@ module OmniAuth
       #
       # Returns instance of OmniAuth::Slack::OAuth2::Client.
       #
-      def client
-        #new_client = super
-        
+      def client        
         # Simple override to use our custom subclassed OAuth2::Client instead.
         # The Client.new call is lifted directly from OmniAuth::Strategies::OAuth2.
         new_client = OmniAuth::Slack::OAuth2::Client.new(options.client_id, options.client_secret, deep_symbolize(options.client_options))
@@ -176,18 +175,17 @@ module OmniAuth
       def callback_url
         options.redirect_uri || full_host + script_name + callback_path
       end
-
       
-      private
-      
-      def user_id
-        # access_token['user_id'] || access_token['user'].to_h['id'] || access_token['authorizing_user'].to_h['user_id']
-        access_or_user_token&.user_id
-      end
-
-      def team_id
-        access_token&.team_id
-      end
+      ### Possibly obsolete
+      #
+      #   def user_id
+      #     # access_token['user_id'] || access_token['user'].to_h['id'] || access_token['authorizing_user'].to_h['user_id']
+      #     access_or_user_token&.user_id
+      #   end
+      # 
+      #   def team_id
+      #     access_token&.team_id
+      #   end
       
       # Gets and decodes :pass_through_params option.
       #
@@ -210,10 +208,11 @@ module OmniAuth
       # Simplifying this to just 'access_token.to_hash' does not appear to
       # have any noticeable negative effect.
       #
-      def auth
-        @auth ||= access_token.to_hash
-      end
-
+      # Possibly obsolete
+      #
+      #   def auth
+      #     @auth ||= access_token.to_hash
+      #   end
 
       # This hash is handed to the access-token (or is it the AuthHash?), which in turn fills it with API response objects.
       #
