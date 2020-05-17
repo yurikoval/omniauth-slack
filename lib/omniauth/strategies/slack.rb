@@ -161,9 +161,12 @@ module OmniAuth
         # Simple override to use our custom subclassed OAuth2::Client instead.
         # The Client.new call is lifted directly from OmniAuth::Strategies::OAuth2.
         new_client = OmniAuth::Slack::OAuth2::Client.new(options.client_id, options.client_secret, deep_symbolize(options.client_options))
-               
+        
         # Set client#subdomain with custom team_domain, if exists and allowed.
         new_client.subdomain = (pass_through_params.include?('team_domain') && request.params['team_domain']) ? request.params['team_domain'] : options.team_domain
+        
+        # Activates Client request history for this client instance.
+        new_client.history = Array.new
         
         #   # Put the raw_info in a place where the Client will update it for each API request.
         #   new_client.history = raw_info
