@@ -13,10 +13,7 @@ module OmniAuth
         client_key,
         OmniAuth::Strategies::Slack.default_options.client_options.to_h.map{|k,v| [k.to_sym, v]}.to_h
       )
-      
-      #client.extend Helpers::Client
-      #client.options[:raise_errors] = false
-      
+
       access_token = case
         when token_string_or_hash.is_a?(String)
           OmniAuth::Slack::OAuth2::AccessToken.new(client, token_string_or_hash)
@@ -24,7 +21,6 @@ module OmniAuth
           OmniAuth::Slack::OAuth2::AccessToken.from_hash(client, token_string_or_hash)
       end
       
-      #access_token.extend Helpers::AccessToken if access_token
       access_token
     end
     

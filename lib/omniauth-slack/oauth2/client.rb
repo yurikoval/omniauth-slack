@@ -9,7 +9,29 @@ module OmniAuth
   module Slack
     module OAuth2
       class Client < ::OAuth2::Client
+        
         include OmniAuth::Slack::Debug
+        
+        #using StringRefinements
+        #using OAuth2Refinements
+        
+        # If this is an array, request history will be stored.
+        # Only store request history if each Client instance is relatively short-lived.
+        #
+        # From your app, you can set this:
+        #   OmniAuth::Slack::OAuth2::Client::HISTORY_DEFAULT ||= []
+        #
+        # Then, in your authorization callback action, you can direct
+        # the OAuth2::Client request history to the AuthHash#['extra']['raw_info']:
+        #   @auth_hash = env['omniauth.auth']
+        #   @access_token = env['omniauth.strategy'].access_token
+        #   @access_token.client.history = @auth_hash.extra.raw_info
+        #
+        # TODO: The above seems a little messy. Maybe use a proc
+        #       to rediredct Client request history to wherever.
+        #       Or maybe don't offer any history storage at all.
+        #
+        HISTORY_DEFAULT=nil
       
         attr_accessor :logger, :history, :subdomain
         
@@ -17,7 +39,7 @@ module OmniAuth
           debug{"args: #{args}"}
           super
           self.logger = OmniAuth.logger
-          self.history = []  #{}
+          self.history ||= HISTORY_DEFAULT.dup
         end
                 
         # Overrides OAuth2::Client#get_token to pass in the omniauth-slack AccessToken class.
@@ -28,15 +50,19 @@ module OmniAuth
           rslt
         end
         
-        # Logs each API request and stores the API result in @history hash.
+        # Logs each API request and stores the API result in History array (if exists).
         # TODO: There should be some kind of option to disable this.
         def request(*args)
           logger.debug "(slack) API request '#{args[0..1]}'."  # in thread '#{Thread.current.object_id}'."  # by Client '#{self}'
           debug{"API request args #{args}"}
           request_output = super(*args)
           uri = args[1].to_s.gsub(/^.*\/([^\/]+)/, '\1') # use single-quote or double-back-slash for replacement.
-          #history["#{uri.to_s}_#{Time.now.to_i}"] = request_output
-          history << {api_call: uri.to_s, time: Time.now, response: request_output}
+          if history.is_a?(Array)
+            debug{"Saving response to history object #{history.object_id}"}
+            history << OmniAuth::Slack::AuthHash.new(
+              {api_call: uri.to_s, time: Time.now, response: request_output}
+            )
+          end
           #debug{"API response (#{args[0..1]}) #{request_output.class}"}
           debug{"API response #{request_output.response.env.body}"}
           request_output
@@ -54,24 +80,26 @@ module OmniAuth
           end
         end
 
-        # Overrides #authorize_url to handle a proc (allowing influence from flow_version).
-        def authorize_url(*args)
-          debug{"authorize_url args: #{args}"}
-          debug{"authorize_url options: #{options}"}
-          if options[:authorize_url].is_a?(Proc)
-            options[:authorize_url] = instance_eval &(options[:authorize_url])
-          end
-          debug{"authorize_url resolved: #{options[:authorize_url]}"}
-          super
-        end
-        
-        # Overrides #token_url to handle a proc (allowing influence from flow_version).
-        def token_url(*args)
-          if options[:token_url].is_a?(Proc)
-            options[:token_url] = instance_eval &(options[:token_url])
-          end
-          super
-        end
+        #   ### No longer needed, since we no longer have client-option :flow_version.
+        #
+        #   # Overrides #authorize_url to handle a proc (allowing influence from flow_version).
+        #   def authorize_url(*args)
+        #     debug{"authorize_url args: #{args}"}
+        #     debug{"authorize_url options: #{options}"}
+        #     if options[:authorize_url].is_a?(Proc)
+        #       options[:authorize_url] = instance_eval &(options[:authorize_url])
+        #     end
+        #     debug{"authorize_url resolved: #{options[:authorize_url]}"}
+        #     super
+        #   end
+        #   
+        #   # Overrides #token_url to handle a proc (allowing influence from flow_version).
+        #   def token_url(*args)
+        #     if options[:token_url].is_a?(Proc)
+        #       options[:token_url] = instance_eval &(options[:token_url])
+        #     end
+        #     super
+        #   end
         
       end
     end

@@ -2,7 +2,6 @@ require 'omniauth-slack/refinements'
 
 module OmniAuth
   module Slack
-    #using ObjectRefinements
     
     ### Prepend Semaphore module to get simple mutexes for each/any method.
 

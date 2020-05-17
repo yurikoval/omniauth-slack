@@ -8,15 +8,6 @@ require 'omniauth/auth_hash'
 module OmniAuth
   module Slack
         
-    # Why is this here? We can just override the method in Strategy.
-    # module OmniAuthRefinements
-    #   refine OmniAuth::Strategies::OAuth2 do
-    #     def client
-    #       OmniAuth::Slack::OAuth2::Client.new(options.client_id, options.client_secret, deep_symbolize(options.client_options))
-    #     end
-    #   end
-    # end
-      
     # Is this necessary? It's only used in some of the data-methods.
     module OAuth2Refinements
       refine OAuth2::Response do
@@ -25,13 +16,6 @@ module OmniAuth
         end
       end
     end
-
-    # Don't need this either... just subclass the AuthHash in Strategy.
-    # module AuthHashRefinements
-    #   refine OmniAuth::AuthHash do
-    #     include Hashie::Extensions::DeepFind
-    #   end
-    # end
 
     module ArrayRefinements
       refine ::Array do
@@ -65,17 +49,7 @@ module OmniAuth
         end
       end
     end
-    
-    # module ObjectRefinements
-    #   refine Object do
-    #     # Get name of method that called the current method.
-    #     def caller_method_name
-    #       #caller[0][/`([^']*)'/, 1] # This gets the method name only 1 level up.
-    #       caller[1][/`([^']*)'/, 1]  # This gets the method name 2 levels up.
-    #     end
-    #   end
-    # end
-    
+
     module CallerMethodName
       def caller_method_name
         #caller[0][/`([^']*)'/, 1] # This gets the method name only 1 level up.

@@ -2,7 +2,7 @@
 
 require 'oauth2/access_token'
 require 'omniauth-slack/refinements'
-require 'omniauth-slack/data_methods'
+#require 'omniauth-slack/data_methods'
 require 'omniauth-slack/debug'
 
 # The AccessToken object is built from an access-token-hash, which is returned from the get-token
@@ -40,10 +40,9 @@ module OmniAuth
       # Enhanced subclass of OAuth2::AccessToken, used by OmniAuth::Slack
       # whenever an OAuth2::AccessToken is required.
       #
-      # Adds class and instance scope-query method +has_scope?+, and adds
-      # basic API data methods and access methods.
+      # Adds class and instance scope-query method +has_scope?+.
       class AccessToken < ::OAuth2::AccessToken        
-        include OmniAuth::Slack::DataMethods
+        #include OmniAuth::Slack::DataMethods
         include OmniAuth::Slack::Debug
 
         # AccessToken instance (self), so Strategy data-methods can be copied to AccessToken without modification.
@@ -140,94 +139,7 @@ module OmniAuth
         def person_uid
           person_user_id && team_id ? "#{person_user_id}-#{team_id}" : nil
         end
-
-        
-        data_method :api_users_identity,
-          scope: {classic:'identity.basic', identity:'identity:read:user'},
-          storage: :api_users_identity,
-          #condition: proc{ true },
-          #condition: proc{ token_type? 'user' },
-          condition: proc{ person_user_id },
-          default_value: {},
-          source: [
-            {name: 'access_token', code: proc{ get('/api/users.identity', headers: {'X-Slack-User' => person_user_id}).parsed }}
-          ]
-                    
-        data_method :api_users_info do
-          default_value AuthHash.new
-          scope classic: 'users:read', team: 'users:read'
-          condition { user_id }
-          source :access_token do |*args|
-            debug{ "api_users_info args[0]: #{args[0]}" }
-            get('/api/users.info', params: {user: (args[0] || user_id)}, headers: {'X-Slack-User' => (args[0] || user_id)}).to_auth_hash
-          end
-        end
-  
-        data_method :api_users_profile do
-          default_value AuthHash.new
-          scope classic: 'users.profile:read', team: 'users.profile:read'
-          condition { user_id }
-          source :access_token do
-            get('/api/users.profile.get', params: {user: user_id}, headers: {'X-Slack-User' => user_id}).to_auth_hash
-          end
-        end      
-  
-        data_method :api_team_info do
-          scope classic: 'team:read', team:'team:read'
-          default_value Hash.new
-          source :access_token do
-            get('/api/team.info').parsed
-          end
-        end
-        
-        # Info about bots on the token's team, NOT info about a bot token from v2 API.
-        data_method :api_bots_info do
-          scope classic: 'users:read', team: 'users:read'
-          #condition { !is_app_token? }
-          condition { ! token_type?('app') }
-          default_value Hash.new
-          source :access_token do
-            get('/api/bots.info').parsed
-          end
-        end
-        
-        # Identity scopes (workspace apps only).
-        # Given _user_id, returns specific identity scopes.
-        #
-        # Sets @apps_permissions_users_list with parsed API response.
-        #
-        # _user_id  - String of Slack user ID.
-        #
-        # TODO: Can this be converted to a data-method?
-        #
-        def apps_permissions_users_list(_user_id=nil)
-          #raise StandardError, "APUL caller #{caller_method_name} user #{_user_id}"
-          #return {} unless is_app_token?
-          return {} unless token_type?('app')
-          semaphore.synchronize {
-            @apps_permissions_users_list ||= (
-              r = get('/api/apps.permissions.users.list').parsed
-              r['resources'].to_a.inject({}){|h,i| h[i['id']] = i; h} || {}
-            )
-            _user_id ? @apps_permissions_users_list[_user_id].to_h['scopes'] : @apps_permissions_users_list
-          }
-        end
-        
-        # Hash of current scopes for this token (workspace apps only).
-        # NOTE: Workspace apps are deprecated!
-        #
-        # Sets +@apps_permissions_scopes_list+ with parsed API response.
-        def apps_permissions_scopes_list
-          #return {} unless is_app_token?
-          return {} unless token_type?('app')
-            semaphore.synchronize {
-            @apps_permissions_scopes_list ||= (
-              r = get('/api/apps.permissions.scopes.list').parsed
-              r['scopes'] || {}
-            )
-          }
-        end
-                
+                        
         # Compiles scopes awarded to this AccessToken.
         # Given _user_id, includes +apps.permissions.users.list+.
         #
@@ -247,23 +159,17 @@ module OmniAuth
             
             @all_scopes = (
               scopes = case
-                # when params['scope'] && token_type? 'bot'
-                #   {'bot' => params['scope'].words}
-                # when params['scope'] && token_type? 'user'
-                #   {'user' => params['scope'].words}
                 when ! params['scope'].to_s.empty?
                   {'classic' => params['scope'].words}
                 when params['scopes'].to_h.any?
                   params['scopes']
-                #when is_app_token?
-                when token_type?('app')
-                  apps_permissions_scopes_list
+                #when token_type?('app')
+                #  apps_permissions_scopes_list
                 else
                   #{}
               end
               
-              #scopes['identity'] = apps_permissions_users_list(_user_id) if _user_id && is_app_token?
-              scopes['identity'] = apps_permissions_users_list(_user_id) if _user_id && token_type?('app')
+              #scopes['identity'] = apps_permissions_users_list(_user_id) if _user_id && token_type?('app')
               params['scopes'] = scopes if token_type?('app')
               scopes
             )

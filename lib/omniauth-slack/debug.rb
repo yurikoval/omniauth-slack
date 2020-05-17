@@ -36,7 +36,7 @@ module OmniAuth
           end
           klass_name = klass.to_s.split('::').last.to_s
           log_text = yield
-          full_text = "(#{klass_name} #{method_name}) #{log_text}"
+          full_text = "(#{klass_name} #{method_name}) #{log_text}"   #{Thread.current.object_id} 
           
           if filter && !LOG_ALL.include?(filter.to_s.downcase)
             regexp = filter.is_a?(Regexp) ? filter : Regexp.new(filter.to_s, true)
