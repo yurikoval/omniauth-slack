@@ -3,10 +3,6 @@ require 'helper'
 class StrategyTest < StrategyTestCase
   include OAuth2StrategyTests
   
-  # test 'includes DataMethods' do
-  #   assert_equal true, strategy.class.ancestors.include?(OmniAuth::Slack::DataMethods)
-  # end
-  
   test 'defines custom AuthHash subclass' do
     assert_equal true, strategy.class::AuthHash.ancestors.include?(OmniAuth::Slack::AuthHash)
   end
@@ -45,20 +41,6 @@ class ClientTest < StrategyTestCase
     OmniAuth.logger.expects(:debug).with(){|*params| assert_match(/http:\/\/host\/api\/test.action/, params[0])}
     @client.request(:get, 'http://host/api/test.action')
   end
-  
-  # test 'request adds api response to raw_info hash' do
-  #   # We need to manually stub the base #request method,
-  #   # since we're testing the override in the subclassed Client.
-  #   ::OAuth2::Client.class_eval do
-  #     def request(*args)
-  #       {'simple' => 'hash'}
-  #     end
-  #   end
-  #   @client = strategy.client
-  #   @client.request(:get, 'http://host/api/test.action')
-  #   #assert_equal( {'test.action' => {'simple' => 'hash'}}, @client.history )
-  #   assert_equal( {'test.action' => {'simple' => 'hash'}}, strategy.send(:raw_info) )
-  # end
   
   test 'request adds api response to @history array' do
     # We need to manually stub the base #request method,
@@ -296,17 +278,6 @@ class PassThroughParamsTest < StrategyTestCase
     assert_equal %w(scope team_domain), strategy.send(:pass_through_params)
   end
 end
-
-# class GetAdditionalDataTest < StrategyTestCase
-#   test "returns compiled result data from additional_data methods." do
-#     additiona_data = {test_additional_data: proc{"yay it works"}}
-#     strategy.options.additional_data = additiona_data
-#     strategy.class.define_additional_data(additiona_data)
-#     #puts strategy.data_methods.test_additional_data.call(strategy)
-#     #puts strategy.test_additional_data
-#     assert_equal "yay it works", strategy.send(:get_additional_data)['test_additional_data']
-#   end
-# end
 
 
 
