@@ -3,9 +3,9 @@ require 'helper'
 class StrategyTest < StrategyTestCase
   include OAuth2StrategyTests
   
-  test 'includes DataMethods' do
-    assert_equal true, strategy.class.ancestors.include?(OmniAuth::Slack::DataMethods)
-  end
+  # test 'includes DataMethods' do
+  #   assert_equal true, strategy.class.ancestors.include?(OmniAuth::Slack::DataMethods)
+  # end
   
   test 'defines custom AuthHash subclass' do
     assert_equal true, strategy.class::AuthHash.ancestors.include?(OmniAuth::Slack::AuthHash)
@@ -46,7 +46,21 @@ class ClientTest < StrategyTestCase
     @client.request(:get, 'http://host/api/test.action')
   end
   
-  test 'request adds api response to raw_info hash' do
+  # test 'request adds api response to raw_info hash' do
+  #   # We need to manually stub the base #request method,
+  #   # since we're testing the override in the subclassed Client.
+  #   ::OAuth2::Client.class_eval do
+  #     def request(*args)
+  #       {'simple' => 'hash'}
+  #     end
+  #   end
+  #   @client = strategy.client
+  #   @client.request(:get, 'http://host/api/test.action')
+  #   #assert_equal( {'test.action' => {'simple' => 'hash'}}, @client.history )
+  #   assert_equal( {'test.action' => {'simple' => 'hash'}}, strategy.send(:raw_info) )
+  # end
+  
+  test 'request adds api response to @history array' do
     # We need to manually stub the base #request method,
     # since we're testing the override in the subclassed Client.
     ::OAuth2::Client.class_eval do
@@ -55,9 +69,11 @@ class ClientTest < StrategyTestCase
       end
     end
     @client = strategy.client
+    @client.history = []
     @client.request(:get, 'http://host/api/test.action')
     #assert_equal( {'test.action' => {'simple' => 'hash'}}, @client.history )
-    assert_equal( {'test.action' => {'simple' => 'hash'}}, strategy.send(:raw_info) )
+    #assert_equal( {'test.action' => {'simple' => 'hash'}}, strategy.send(:raw_info) )
+    assert_equal( {'api_call' => 'test.action', 'response' => {'simple' => 'hash'}}, @client.history[0].to_h.tap{|r| r.delete('time')} )
   end
   
   test "transfers team_domain from options to client.site uri" do
@@ -93,12 +109,13 @@ class UidTest < StrategyTestCase
   def setup
     super
     @access_token = stub("OmniAuth::Slack::OAuth2::AccessToken")
-    @access_token.stubs(:user_id).returns('U123')
-    @access_token.stubs(:team_id).returns('T456')
+    #@access_token.stubs(:user_id).returns('U123')
+    #@access_token.stubs(:team_id).returns('T456')
     strategy.stubs(:access_token).returns(@access_token)
   end
 
-  test "returns the user ID from user_identity" do
+  test "returns the uid from access_token" do
+    @access_token.stubs(:uid).returns("U123-T456")
     assert_equal "U123-T456", strategy.uid
   end
 end
@@ -108,13 +125,17 @@ class CredentialsTest < StrategyTestCase
     super
     @access_token = stub("OmniAuth::Slack::OAuth2::AccessToken")
     @access_token.stubs(:token)
+    @access_token.stubs(:token_type)
     @access_token.stubs(:expires?)
     @access_token.stubs(:expires_at)
     @access_token.stubs(:refresh_token)
     @access_token.stubs(:[])
     @access_token.stubs(:params)
     @access_token.stubs(:is_app_token?)
+    @access_token.stubs(:scope)
+    @access_token.stubs(:scopes)
     @access_token.stubs(:all_scopes)
+    @access_token.stubs(:user_token)
     strategy.stubs(:access_token).returns(@access_token)
   end
 
@@ -125,6 +146,11 @@ class CredentialsTest < StrategyTestCase
   test "returns the token" do
     @access_token.stubs(:token).returns("123")
     assert_equal "123", strategy.credentials["token"]
+  end
+  
+  test "returns the token_type" do
+    @access_token.stubs(:token_type).returns('bot')
+    assert_equal 'bot', strategy.credentials[:token_type]    
   end
 
   test "returns the expiry status" do
@@ -242,11 +268,11 @@ class CallbackPhaseTest < StrategyTestCase
     assert_equal( {'team'=>'ABC123'}, strategy.env['omniauth.authorize_params'] )
   end
   
-  test 'triggers define_additional_data with data from options[:additional_data]' do
-    strategy.options.additional_data = {channels:'123'}
-    strategy.class.expects(:define_additional_data).with({'channels' => '123'})
-    strategy.callback_phase
-  end
+  # test 'triggers define_additional_data with data from options[:additional_data]' do
+  #   strategy.options.additional_data = {channels:'123'}
+  #   strategy.class.expects(:define_additional_data).with({'channels' => '123'})
+  #   strategy.callback_phase
+  # end
 end
 
 class PassThroughParamsTest < StrategyTestCase
@@ -271,16 +297,16 @@ class PassThroughParamsTest < StrategyTestCase
   end
 end
 
-class GetAdditionalDataTest < StrategyTestCase
-  test "returns compiled result data from additional_data methods." do
-    additiona_data = {test_additional_data: proc{"yay it works"}}
-    strategy.options.additional_data = additiona_data
-    strategy.class.define_additional_data(additiona_data)
-    #puts strategy.data_methods.test_additional_data.call(strategy)
-    #puts strategy.test_additional_data
-    assert_equal "yay it works", strategy.send(:get_additional_data)['test_additional_data']
-  end
-end
+# class GetAdditionalDataTest < StrategyTestCase
+#   test "returns compiled result data from additional_data methods." do
+#     additiona_data = {test_additional_data: proc{"yay it works"}}
+#     strategy.options.additional_data = additiona_data
+#     strategy.class.define_additional_data(additiona_data)
+#     #puts strategy.data_methods.test_additional_data.call(strategy)
+#     #puts strategy.test_additional_data
+#     assert_equal "yay it works", strategy.send(:get_additional_data)['test_additional_data']
+#   end
+# end
 
 
 

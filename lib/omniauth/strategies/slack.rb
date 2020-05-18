@@ -12,6 +12,7 @@ module OmniAuth
   module Strategies
     class Slack < OmniAuth::Strategies::OAuth2
       include OmniAuth::Slack::Debug 
+      include OmniAuth::Slack::Semaphore
       
       # This is a forward-declaration (or is just an override?),
       # so that AuthHash is NOT derived directly from the base OmniAuth::AuthHash.
@@ -214,7 +215,7 @@ module OmniAuth
       #     @auth ||= access_token.to_hash
       #   end
 
-      # This hash is handed to the access-token (or is it the AuthHash?), which in turn fills it with API response objects.
+      # Points to client @history, which is filled with API response objects.
       #
       def raw_info
         @raw_info ||= access_token.client.history
