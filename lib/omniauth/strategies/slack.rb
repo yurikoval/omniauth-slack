@@ -43,6 +43,7 @@ module OmniAuth
         token_url: '/api/oauth.v2.access',
         auth_scheme: :basic_auth,
         raise_errors: false, # MUST be false to allow Slack's non-compliant get-token response in v2 flow.
+        history: Array.new,
       }
       
       # Authorization token-exchange API call options.
@@ -157,13 +158,16 @@ module OmniAuth
       def client        
         # Simple override to use our custom subclassed OAuth2::Client instead.
         # The Client.new call is lifted directly from OmniAuth::Strategies::OAuth2.
-        new_client = OmniAuth::Slack::OAuth2::Client.new(options.client_id, options.client_secret, deep_symbolize(options.client_options))
+        # This allows us to send team_domain (custom subdomain) to the Client instance,
+        # and also allows us to enable/disable Client instance history.
+        team_domain = (pass_through_params.include?('team_domain') && request.params['team_domain']) ? request.params['team_domain'] : options.team_domain
+        new_client = OmniAuth::Slack::OAuth2::Client.new(options.client_id, options.client_secret, deep_symbolize(options.client_options.merge({subdomain:team_domain})))
         
         # Set client#subdomain with custom team_domain, if exists and allowed.
-        new_client.subdomain = (pass_through_params.include?('team_domain') && request.params['team_domain']) ? request.params['team_domain'] : options.team_domain
+        #new_client.subdomain = (pass_through_params.include?('team_domain') && request.params['team_domain']) ? request.params['team_domain'] : options.team_domain
         
         # Activates Client request history for this client instance.
-        new_client.history = Array.new
+        #new_client.history = Array.new
         
         debug{"Strategy #{self} using Client #{new_client} with callback_url #{callback_url}"}
         

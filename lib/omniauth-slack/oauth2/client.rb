@@ -32,14 +32,16 @@ module OmniAuth
         #       Or maybe don't offer any history storage at all.
         #
         HISTORY_DEFAULT=nil
+        SUBDOMAIN_DEFAULT=nil
       
         attr_accessor :logger, :history, :subdomain
         
-        def initialize(*args)
+        def initialize(*args, **options)
           debug{"args: #{args}"}
           super
           self.logger = OmniAuth.logger
-          self.history ||= HISTORY_DEFAULT.dup
+          self.history ||= (options[:history] || HISTORY_DEFAULT).dup
+          self.subdomain ||= options[:subdomain] || SUBDOMAIN_DEFAULT
         end
                 
         # Overrides OAuth2::Client#get_token to pass in the omniauth-slack AccessToken class.
