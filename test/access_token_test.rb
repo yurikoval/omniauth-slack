@@ -46,11 +46,18 @@ describe OmniAuth::Slack::OAuth2::AccessToken do
   end
   
   describe 'all_scopes' do
-    it 'calls apps_permissions_users_list if passed a user_id' do
+    it 'retrieves compiled hash of all scopes currently visible on token' do
     end
   end
   
   describe 'has_scope?' do
+    it 'passes array of classic scopes to class-level has_scope?' do
+      assert_equal true, @access_token.has_scope?('identify', 'channels:read', 'boblobla', base:@scope_base)
+    end
+    
+    it 'passes string of classic scopes to class-level has_scope?' do
+      assert_equal true, @access_token.has_scope?('identify,channels:read,boblobla', base:@scope_base)
+    end
   end
   
   describe 'self.has_scope?' do    
@@ -58,20 +65,20 @@ describe OmniAuth::Slack::OAuth2::AccessToken do
       assert_equal true, @at_class.has_scope?(scope_query:'identify,channels:read,chat:write:bot,users.profile:read', scope_base:@scope_base)
     end
     
-    # it 'DOES NOT accept an array of strings of classic scopes to be matched against base-scopes containing :classic key' do
-    #   assert_equal true, @at_class.has_scope?(scope_query:['identify', 'channels:read', 'chat:write:bot', 'users.profile:read'], scope_base:@scope_base)
-    # end
-    
+    it 'accepts an array of classic scopes to be matched against base-scopes containing :classic key' do
+      assert_equal true, @at_class.has_scope?(scope_query:['identify','channels:read','chat:write:bot','users.profile:read'], scope_base:@scope_base)
+    end
+
     it 'accepts a scope_query hash' do
-      assert_equal true, @at_class.has_scope?(scope_query:{channel:'channelss:read im:read', group:'chat:write'}, scope_base:@scope_base)
+      assert_equal true, @at_class.has_scope?(scope_query:{channel:'channels:read im:read', group:'chat:write'}, scope_base:@scope_base)
     end
     
     it 'accepts an array of scope_query hashes' do
-      assert_equal true, @at_class.has_scope?(scope_query:[{channel:'channelss:read im:read', group:'chat:write'}, {app_home:'chat:write'}], scope_base:@scope_base)
+      assert_equal true, @at_class.has_scope?(scope_query:[{channel:'channels:read im:read', group:'chat:write'}, {app_home:'chat:write'}], scope_base:@scope_base)
     end
 
     it 'accepts a scope_query hash with array of string values' do
-      assert_equal true, @at_class.has_scope?(scope_query:{channel: %w(channelss:read im:read chat:write)}, scope_base:@scope_base)
+      assert_equal true, @at_class.has_scope?(scope_query:{channel: %w(channels:read im:read chat:write)}, scope_base:@scope_base)
     end
     
     it "accepts a :logic param to switch to 'and' (all) logic from 'or' (any) logic" do

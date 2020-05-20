@@ -56,9 +56,10 @@ class ClientTest < StrategyTestCase
     #assert_equal( {'test.action' => {'simple' => 'hash'}}, @client.history )
     #assert_equal( {'test.action' => {'simple' => 'hash'}}, strategy.send(:raw_info) )
     assert_equal( {'api_call' => 'test.action', 'response' => {'simple' => 'hash'}}, @client.history[0].to_h.tap{|r| r.delete('time')} )
+    
   end
   
-  test "transfers team_domain from options to client.site uri" do
+  test "transfers team_domain from strategy options to client.site uri" do
     @options = { :team_domain => 'subdomain' }
     assert_equal "https://subdomain.slack.com", strategy.client.site
   end
@@ -67,6 +68,11 @@ class ClientTest < StrategyTestCase
     @options = {pass_through_params: 'team_domain' }
     @request.stubs(:params).returns({ 'team_domain' => 'subdomain2' })
     assert_equal "https://subdomain2.slack.com", strategy.client.site
+  end
+  
+  test "transfers history option from strategy client_options to client.history" do
+    @options = { :client_options => {history:[5]} }
+    assert_equal [5], strategy.client.history
   end
 end
 

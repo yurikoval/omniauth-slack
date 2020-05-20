@@ -191,7 +191,7 @@ module OmniAuth
         # The keywords need to be symbols, so any hash passed as an argument
         # (or as the entire set of args) should have symbolized keys!
         #
-        # freeform_array    - [*Array, nil] default: [], array of scope query hashes
+        # freeform_array    - [*Array, nil] default: [], array of scope query hashes or string(s)
         #
         # :query            - [Hash, Array, nil] default: nil, a single scope-query Hash (or Array of Hashes)
         #
@@ -221,7 +221,6 @@ module OmniAuth
           return unless query
           
           query = [query].flatten if query.is_a?(Array) || query.is_a?(String)
-          query = {classic: query} if query.is_a?(Array) && query.first.is_a?(String)
           
           user ||= user_id
           debug{"using user '#{user}' and query '#{query}'"}
@@ -279,6 +278,25 @@ module OmniAuth
           debug{"class-level scope_query '#{scope_query}' scope_base '#{scope_base}' logic '#{logic}'"}
           _scope_query = scope_query.is_a?(String) ? {classic: scope_query} : scope_query
           _scope_query = [_scope_query].flatten
+          
+          # Converts array of unknown strings to uniform hash of classic:[array-of-scope-strings].
+          if _scope_query.is_a?(Array)
+            new_query = []
+            classic_array = []
+            _scope_query.each_with_index do |q,n|
+              if q.is_a?(String)
+                classic_array.concat(q.words)
+                debug{"building classic_array with words from string '#{q.words}' to give: #{classic_array}"}
+              else
+                new_query << _scope_query[n]
+              end
+            end
+            if classic_array.any?
+              new_query.unshift({classic: classic_array.flatten.uniq})
+            end
+            _scope_query = new_query
+          end
+          
           _scope_base  = scope_base
           raise "scope_base must be a hash" unless (_scope_base.is_a?(Hash) || _scope_base.respond_to?(:to_h))
           

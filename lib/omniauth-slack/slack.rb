@@ -44,7 +44,6 @@ module OmniAuth
 
       def call(env)
         @env = env
-        #@logger = logger = env['rack.logger']
         @logger = logger = OmniAuth.logger
         
         debug{"calling middleware"}
