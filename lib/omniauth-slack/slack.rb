@@ -42,8 +42,8 @@ module OmniAuth
 
       def initialize(app)
         @app             = app
-        @app_id          = ENV['SLACK_APP_ID']
-        @signing_secret  = ENV['SLACK_SIGNING_SECRET']
+        @app_id          = nil
+        @signing_secret  = nil
         
         middleware_instance = self
         

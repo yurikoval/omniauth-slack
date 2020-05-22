@@ -647,12 +647,23 @@ When a successful authorization cycle completes, your browser should end up with
 
 ## Advanced
 
-* Optional OmniAuth::Slack::VerifySlackSignature middleware handles signature
-  verification of incoming Slack requests (experimental).
-
 * Customize AuthHash with additional API calls during the callback phase.
 
-* Deep debug with ENV['OMNIAUTH\_SLACK\_DEBUG']=true
+* Deep debug with `ENV['OMNIAUTH_SLACK_DEBUG']=true`
+
+* Optional OmniAuth::Slack::VerifySlackSignature middleware handles signature
+  verification for incoming Slack requests (experimental).
+  
+  ```ruby
+    use OmniAuth::Slack::VerifySlackSignature do |config|
+      config.app_id          = ENV['SLACK_APP_ID']
+      config.signing_secret  = ENV['SLACK_SIGNING_SECRET']
+    end
+    
+    # When legitimate incoming Slack request comes into your app.
+    #  => env['omniauth.slack.verification'] == true
+    
+  ```
 
 
 ## Contributing
