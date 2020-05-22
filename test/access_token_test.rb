@@ -18,9 +18,9 @@ describe OmniAuth::Slack::OAuth2::AccessToken do
     assert_equal 'my team', @access_token.team_name
   end
   
-  it 'defines access_token to provide universal access for data-methods' do
-    assert_equal @access_token, @access_token.access_token
-  end
+  # it 'defines access_token to provide universal access for data-methods' do
+  #   assert_equal @access_token, @access_token.access_token
+  # end
   
   
   describe 'user_id' do
@@ -56,13 +56,13 @@ describe OmniAuth::Slack::OAuth2::AccessToken do
     end
     
     it 'passes string of classic scopes to class-level has_scope?' do
-      assert_equal true, @access_token.has_scope?('identify,channels:read,boblobla', base:@scope_base)
+      assert_equal true, @access_token.has_scope?('identify channels:read boblobla', base:@scope_base)
     end
   end
   
   describe 'self.has_scope?' do    
     it 'accepts a string of classic scopes to be matched against base-scopes containing :classic key' do
-      assert_equal true, @at_class.has_scope?(scope_query:'identify,channels:read,chat:write:bot,users.profile:read', scope_base:@scope_base)
+      assert_equal true, @at_class.has_scope?(scope_query:'identify channels:read chat:write:bot users.profile:read', scope_base:@scope_base)
     end
     
     it 'accepts an array of classic scopes to be matched against base-scopes containing :classic key' do

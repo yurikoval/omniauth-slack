@@ -8,7 +8,6 @@ require 'omniauth/auth_hash'
 module OmniAuth
   module Slack
         
-    # Is this necessary? It's only used in some of the data-methods.
     module OAuth2Refinements
       refine OAuth2::Response do
         def to_auth_hash

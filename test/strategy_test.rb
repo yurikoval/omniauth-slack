@@ -173,32 +173,6 @@ class CredentialsTest < StrategyTestCase
   end
 end
 
-# The :identity method no longer exists, but this setup may still be useful.
-#
-# class IdentityTest < StrategyTestCase
-# 
-#   def setup
-#     super
-#     @access_token = stub("OmniAuth::Slack::OAuth2::AccessToken")
-#     @access_token.stubs(:[])
-#     @access_token.stubs(:params)
-#     @access_token.stubs(:token)
-#     @access_token.stubs(:to_hash).returns({})
-#     @access_token.stubs(:user_id).returns(nil)
-#     strategy.stubs(:access_token).returns(@access_token)
-#     strategy.stubs(:has_scope?).returns true
-#     strategy.stubs(:is_not_excluded?).returns true
-#     strategy.stubs(:skip_info?).returns false
-#   end
-#   
-#   # There should be 3 of these, one for each condition of the 'case' statement.
-#   test "performs a GET to https://slack.com/api/users.identity" do
-#     @access_token.expects(:get).with("/api/users.identity", {:headers => {"X-Slack-User" => nil}})
-#       .returns(stub_everything("OAuth2::Response"))
-#     strategy.send :identity
-#   end
-# end
-
 # This test is no longer relevant, but if modified, it might still be useful.
 #
 # class SkipInfoTest < StrategyTestCase
@@ -230,17 +204,8 @@ class AuthorizeParamsTest < StrategyTestCase
   
 end
 
-class InitializeTest < StrategyTestCase
-
-  test 'sets @main_semaphore with a new Mutex' do
-    assert_kind_of Mutex, strategy.instance_variable_get(:@main_semaphore)
-  end
-  
-  test 'sets @semaphores with empty hash' do
-    assert_equal( {}, strategy.instance_variable_get(:@semaphores) )
-  end
-
-end
+# class InitializeTest < StrategyTestCase
+# end
 
 class CallbackPhaseTest < StrategyTestCase
   def setup
@@ -255,12 +220,6 @@ class CallbackPhaseTest < StrategyTestCase
     strategy.callback_phase
     assert_equal( {'team'=>'ABC123'}, strategy.env['omniauth.authorize_params'] )
   end
-  
-  # test 'triggers define_additional_data with data from options[:additional_data]' do
-  #   strategy.options.additional_data = {channels:'123'}
-  #   strategy.class.expects(:define_additional_data).with({'channels' => '123'})
-  #   strategy.callback_phase
-  # end
 end
 
 class PassThroughParamsTest < StrategyTestCase
@@ -285,66 +244,3 @@ class PassThroughParamsTest < StrategyTestCase
   end
 end
 
-
-
-# These tests are no longer relevant for the Strategy class,
-# but may be reworked for the classes they were moved to (if still exist).
-#
-# class SemaphoreTest < StrategyTestCase
-# 
-#   def setup
-#     super
-#     
-#     def strategy.test_method
-#       send :semaphore
-#     end
-#   end
-# 
-#   test 'synchronized management of method-specific mutexes' do
-#     strategy.test_method
-#     assert_kind_of Mutex, strategy.instance_variable_get(:@semaphores)['test_method']
-#   end
-# 
-# end
-#
-# class ActiveMethodsTest < StrategyTestCase
-# 
-#   test 'with no settings, returns all defined api methods' do
-#     assert_equal %w(apps_permissions_users_list identity user_info user_profile team_info bot_info),
-#       strategy.send(:active_methods)
-#   end
-#   
-#   test 'with :include_data, returns only included methods' do
-#     strategy.options[:include_data] = %w(identity team_info)
-#     assert_equal %w(identity team_info),
-#       strategy.send(:active_methods)    
-#   end
-# 
-#   test 'with :exclude_data, returns all but excluded methods' do
-#     strategy.options[:exclude_data] = %w(identity team_info)
-#     assert_equal %w(apps_permissions_users_list user_info user_profile bot_info),
-#       strategy.send(:active_methods)    
-#   end
-# 
-# end
-# 
-# class IsNotExcluded < StrategyTestCase
-# 
-#   def setup
-#     super
-#     
-#     def identity
-#       strategy.send 'is_not_excluded?'
-#     end
-#   end
-# 
-#   test 'returns true if calling method is in active-methods' do
-#     assert_equal true, identity
-#   end
-#   
-#   test 'returns false if calling method is not in active-methods' do
-#     strategy.options[:exclude_data] = 'identity'
-#     assert_equal false, identity
-#   end
-# 
-# end

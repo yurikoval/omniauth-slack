@@ -1,7 +1,6 @@
 require 'omniauth/strategies/oauth2'
 require 'omniauth-slack/refinements'
 require 'omniauth-slack/slack'
-require 'omniauth-slack/data_methods'
 require 'omniauth-slack/omniauth/auth_hash'
 require 'thread'
 require 'uri'
@@ -12,7 +11,6 @@ module OmniAuth
   module Strategies
     class Slack < OmniAuth::Strategies::OAuth2
       include OmniAuth::Slack::Debug 
-      include OmniAuth::Slack::Semaphore
       
       # This is a forward-declaration (or is just an override?),
       # so that AuthHash is NOT derived directly from the base OmniAuth::AuthHash.
@@ -110,9 +108,9 @@ module OmniAuth
         access_token.to_hash
       end
 
-
-      # Gathers additiona API calls, user-defined additional_data_method responses,
-      # and raw Slack API responses,
+      # Defines a section for all additional data to be
+      # included with the AuthHash instance.
+      #
       # for :extra section of AuthHash.
       #
       extra do
@@ -122,8 +120,8 @@ module OmniAuth
         }
       end
       
-      # Overrides OmniAuth::Oauth2#authorize_params so that
-      # specified params can be passed on to Slack authorization GET request.
+      # Wraps OmniAuth::Oauth2#authorize_params so that specified params
+      # can be passed on to Slack authorization GET request.
       # See https://github.com/omniauth/omniauth/issues/390
       #
       def authorize_params
@@ -136,12 +134,14 @@ module OmniAuth
         end
       end
       
-      # Overrides OmniAuth callback phase to extract session var
-      # for omniauth.authorize_params into env (this is how omniauth does this).
+      # Pre-sets env vars for super.
+      #
+      # OmniAuth callback phase to extract session var for
+      # omniauth.authorize_params into env (this is how omniauth does this).
       #
       def callback_phase #(*args)
         # This technique copied from OmniAuth::Strategy,
-        # (this is how they do it for the other omniauth objects).
+        # (this is how they do it for other omniauth objects).
         env['omniauth.authorize_params'] = session.delete('omniauth.authorize_params')
         super
       end

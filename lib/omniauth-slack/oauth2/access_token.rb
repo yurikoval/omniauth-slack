@@ -2,7 +2,6 @@
 
 require 'oauth2/access_token'
 require 'omniauth-slack/refinements'
-#require 'omniauth-slack/data_methods'
 require 'omniauth-slack/debug'
 
 # The AccessToken object is built from an access-token-hash, which is returned from the get-token
@@ -45,8 +44,8 @@ module OmniAuth
         #include OmniAuth::Slack::DataMethods
         include OmniAuth::Slack::Debug
 
-        # AccessToken instance (self), so Strategy data-methods can be copied to AccessToken without modification.
-        def access_token; self; end
+        # # AccessToken instance (self), so Strategy data-methods can be copied to AccessToken without modification.
+        # def access_token; self; end
         
         # Intercept super to return nil instead of empty string.
         def token
