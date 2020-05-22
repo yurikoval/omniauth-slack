@@ -1,4 +1,21 @@
-## v2.4.1(2018-09-18)
+## v2.5.0
+
+* Add Slack v2 API support (oauth flow, scopes, tokens).
+
+* Remove additional API calls from callback phase.
+
+* Remove mapping of specific access-token fields to auth-hash `info` section.
+
+* Implement deep-trace logging, activated with `ENV['OMNIAUTH_SLACK_DEBUG']=true`
+
+* Improved `AccessToken#has_scope?` functionality.
+
+* Add optional OmniAuth::Slack::VerifySlackSignature middleware (experimental).
+
+* Numerous code improvements and debugging.
+
+
+## v2.4.1 (2018-09-18)
 
 * Set `client_options[:auth_scheme]` to `:basic_auth`, as OAuth2 gem does not yet make this the default. [wbr]
 

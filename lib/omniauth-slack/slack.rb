@@ -37,15 +37,26 @@ module OmniAuth
     #
     class VerifySlackSignature
       include OmniAuth::Slack::Debug
+      
+      attr_accessor :app_id, :signing_secret
 
       def initialize(app)
-        @app = app
+        @app             = app
+        @app_id          = ENV['SLACK_APP_ID']
+        @signing_secret  = ENV['SLACK_SIGNING_SECRET']
+        
+        middleware_instance = self
+        
+        if block_given?
+          # Can set app_id and signing_secret from here.
+          yield(middleware_instance)
+        end
       end
 
       def call(env)
         @env = env
         @logger = logger = OmniAuth.logger
-        
+                
         debug{"calling middleware"}
 
         env['rack.input'].rewind
@@ -69,18 +80,17 @@ module OmniAuth
           api_app_id      = body_hash['api_app_id']
           slack_signature = env['HTTP_X_SLACK_SIGNATURE']
           slack_timestamp = env['HTTP_X_SLACK_REQUEST_TIMESTAMP']
-          signing_secret  = ENV['SLACK_SIGNING_SECRET']
           
           if ! [api_app_id, slack_signature, slack_timestamp].all?
             logger.debug("(slack) VerifySlackSignature not detecting incoming Slack request")
             pass
             
           elsif signing_secret.to_s.empty?
-            logger.info("(slack) VerifySlackSignature missing ENV['SLACK_SIGNING_SECRET']")
+            logger.info("(slack) VerifySlackSignature missing signing_secret")
             pass
             
-          elsif ENV['SLACK_APP_ID'] && ENV['SLACK_APP_ID'].to_s != api_app_id.to_s
-            logger.info("(slack) VerifySlackSignature api_app_id mismatch")
+          elsif app_id && app_id.to_s != api_app_id.to_s
+            logger.info("(slack) VerifySlackSignature API app_id mismatch")
             pass
             
           else

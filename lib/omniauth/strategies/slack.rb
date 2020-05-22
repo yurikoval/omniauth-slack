@@ -37,12 +37,10 @@ module OmniAuth
       # OAuth2::Client options.
       option :client_options, {
         site: 'https://slack.com',
-        #authorize_url: proc{"/oauth/#{@options[:flow_version]=='v2' ? 'v2/' : ''}authorize"},
         authorize_url: '/oauth/v2/authorize',
-        #token_url: proc{"/api/oauth.#{@options[:flow_version]=='v2' ? 'v2.' : ''}access"},
         token_url: '/api/oauth.v2.access',
         auth_scheme: :basic_auth,
-        raise_errors: false, # MUST be false to allow Slack's non-compliant get-token response in v2 flow.
+        raise_errors: false, # MUST be false to allow Slack's get-token response from v2 API.
         history: Array.new,
       }
       
