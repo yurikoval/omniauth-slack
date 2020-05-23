@@ -3,8 +3,11 @@ require 'helper'
 class StrategyTest < StrategyTestCase
   include OAuth2StrategyTests
   
-  test 'defines custom AuthHash subclass' do
-    assert_equal true, strategy.class::AuthHash.ancestors.include?(OmniAuth::Slack::AuthHash)
+  test 'uses custom AuthHash subclass for auth_hash object' do
+    ::OmniAuth::Strategy.class_eval do
+      def auth_hash; {a:1, b:2}; end
+    end
+    assert_equal true, strategy.auth_hash.is_a?(OmniAuth::Slack::AuthHash)
   end
 end
 
