@@ -12,11 +12,6 @@ module OmniAuth
     class Slack < OmniAuth::Strategies::OAuth2
       include OmniAuth::Slack::Debug 
       
-      # This is a forward-declaration (or is just an override?),
-      # so that AuthHash is NOT derived directly from the base OmniAuth::AuthHash.
-      class AuthHash < OmniAuth::Slack::AuthHash;
-      end
-      
       
       ###  Options  ###
     
@@ -68,7 +63,6 @@ module OmniAuth
       # The combination of user ID and team ID, on the other hand, is guaranteed
       # to be globally unique.
       #
-      #uid { "#{user_id}-#{team_id}" }
       uid { access_token&.uid }
 
 
@@ -119,7 +113,10 @@ module OmniAuth
           raw_info: raw_info
         }
       end
-      
+
+
+      ###  Instance Methods  ###
+
       # Wraps OmniAuth::Oauth2#authorize_params so that specified params
       # can be passed on to Slack authorization GET request.
       # See https://github.com/omniauth/omniauth/issues/390
@@ -146,11 +143,21 @@ module OmniAuth
         super
       end
       
+      # Returns OmniAuth::Slack::AuthHash
+      #
+      # Super result is converted to plain hash first,
+      # so AuthHash can do its recursive build magic.
+      #
+      def auth_hash
+        OmniAuth::Slack::AuthHash.new super.to_hash
+      end
+      
       # Uses OmniAuth::Slack::OAuth2::Client to handle Slack-specific features.
       #
       # * Logs API requests with OmniAuth.logger.
       # * Allows passthrough of Slack team_domain.
       # * Enables/disables Client instance history.
+      # * Allows use of OmniAuth::Slack::OAuth2::AccessToken.
       #
       # Returns instance of OmniAuth::Slack::OAuth2::Client.
       #

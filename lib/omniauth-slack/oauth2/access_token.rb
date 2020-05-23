@@ -41,11 +41,25 @@ module OmniAuth
       #
       # Adds class and instance scope-query method +has_scope?+.
       class AccessToken < ::OAuth2::AccessToken        
-        #include OmniAuth::Slack::DataMethods
         include OmniAuth::Slack::Debug
-
-        # # AccessToken instance (self), so Strategy data-methods can be copied to AccessToken without modification.
-        # def access_token; self; end
+        
+        # Creates simple getter methods to pull specific data from params.
+        def self.define_getters(ary_of_words)
+          ary_of_words.each do |word|
+            obj, atrb = word.split('_')
+            define_method(word) do
+              rslt = (
+                params[word] ||
+                params && params[obj] && params[obj][atrb]
+              )
+              debug { "Simple getter '#{word}' rslt: #{rslt}" }
+              rslt
+            end
+          end
+        end
+        
+        define_getters %w(team_id team_domain scope)
+        
         
         # Intercept super to return nil instead of empty string.
         def token
@@ -79,66 +93,46 @@ module OmniAuth
             elsif params['authed_user']
               rslt = self.class.from_hash(client, params['authed_user']).tap do |t|
                 t.params['token_type'] = 'user'
+                t.params['team_id'] = team_id
               end
             end
           )
         end
         alias_method :authed_user, :user_token
 
-        # Creates simple getter methods to pull specific data from params.
-        %w(user_name user_email team_id team_name team_domain scope).each do |word|
-          obj, atrb = word.split('_')
-          define_method(word) do
-            params[word] ||
-            params && params[obj] && params[obj][atrb]
-          end
-        end
-
-        # AccessToken user_id.
+        # AccessToken user_id. Always get person-user-id, unless none exist.
         def user_id
-          # classic token.
-          params['user_id'] ||
-          # v2 api bot token.
-          params['bot_user_id'] ||
-          # user-id from authed_user hash.
-          params['id'] ||
-          # workspace-app token with attached user.
-          params['user'].to_h['id'] ||
-          # workspace-app token with authorizing user.
-          params['authorizing_user'].to_h['user_id'] #||
-          # if still no id found, pull from the sub-token 'authed_user'.
-          # TODO: I don't think we should do this, since it will be out
-          # of sync with the other methods and data on this token instance.
-          #params['authed_user'].to_h['id']
+          rslt = (
+            # classic token.
+            params['user_id'] ||
+            # from sub-token in 'authed_user'
+            params['authed_user'].to_h['id'] ||
+            # workspace-app token with attached user.
+            params['user'].to_h['id'] ||
+            # workspace-app token with authorizing user.
+            params['authorizing_user'].to_h['user_id'] ||
+            # user-id from authed_user hash.
+            params['id'] #||
+            # v2 api bot token, as a last resort.
+            #params['bot_user_id']
+          )
+          debug { rslt }
+          rslt
         end
         
         # AccessToken unique user-team-id combo.
         # Only works for main token, since sub-tokens don't have team id's.
         def uid
-          _uid = ((user_id || user_token&.user_id) && team_id) ? "#{(user_id || user_token&.user_id)}-#{team_id}" : nil
-          debug { _uid }
-          _uid
+          rslt = (user_id && team_id) ? "#{user_id}-#{team_id}" : nil
+          debug { rslt }
+          rslt
         end
-        
+
         def bot_user_id
           params['bot_user_id']
         end
-        
-        def bot_uid
-          bot_user_id && team_id ? "#{bot_user_id}-#{team_id}" : nil
-        end  
-        
-        def person_user_id
-          case
-            when user_token; user_token&.user_id
-            when user_id.to_s[/U0B/]; user_id
-          end
-        end
-        
-        def person_uid
-          person_user_id && team_id ? "#{person_user_id}-#{team_id}" : nil
-        end
-                        
+
+
         # Compiles scopes awarded to this AccessToken.
         # Given _user_id, includes +apps.permissions.users.list+.
         #
@@ -157,7 +151,7 @@ module OmniAuth
           if _user_id && !@all_scopes.to_h.has_key?('identity') || @all_scopes.nil?
             
             @all_scopes = (
-              scopes = case
+              _scopes = case
                 when ! params['scope'].to_s.empty?
                   {'classic' => params['scope'].words}
                 when params['scopes'].to_h.any?
@@ -168,18 +162,19 @@ module OmniAuth
                   #{}
               end
               
-              #scopes['identity'] = apps_permissions_users_list(_user_id) if _user_id && token_type?('app')
-              params['scopes'] = scopes if token_type?('app')
-              scopes
+              #_scopes['identity'] = apps_permissions_users_list(_user_id) if _user_id && token_type?('app')
+              params['scopes'] = _scopes if token_type?('app')
+              _scopes
             )
             
           else
-            @all_scopes
+            #@all_scopes
           end
           
           #debug{"generated #{@all_scopes}"}
           @all_scopes
         end
+        alias_method :scopes, :all_scopes
         
         # Match a given set of scopes against this token's awarded scopes,
         # classic and workspace token compatible.

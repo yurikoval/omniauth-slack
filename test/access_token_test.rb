@@ -5,7 +5,12 @@ describe OmniAuth::Slack::OAuth2::AccessToken do
     @access_token = OmniAuth::Slack::OAuth2::AccessToken.new(
       OmniAuth::Slack::OAuth2::Client.new('key','secret'),
       "ABC123DEF456",
-      {'user' => {'id' => '11', 'name' => 'bill'}, 'team_id' => 33, 'team_name' => 'my team'}
+      {
+        'user' => {'id' => '11', 'name' => 'bill'},
+        'team_id' => 33,
+        'team_name' => 'my team',
+        'scope' => 'users:read'
+      }
     )
     
     @at_class = OmniAuth::Slack::OAuth2::AccessToken
@@ -14,14 +19,9 @@ describe OmniAuth::Slack::OAuth2::AccessToken do
   end
   
   it 'defines getter methods for basic user data' do
-    assert_equal 'bill', @access_token.user_name
-    assert_equal 'my team', @access_token.team_name
+    assert_equal 'users:read', @access_token.scope
+    assert_equal 33, @access_token.team_id
   end
-  
-  # it 'defines access_token to provide universal access for data-methods' do
-  #   assert_equal @access_token, @access_token.access_token
-  # end
-  
   
   describe 'user_id' do
     it "gets data from params['user'].to_h['id']" do

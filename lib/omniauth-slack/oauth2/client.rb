@@ -44,7 +44,7 @@ module OmniAuth
           self.subdomain ||= options[:subdomain] || SUBDOMAIN_DEFAULT
         end
                 
-        # Overrides OAuth2::Client#get_token to pass in the omniauth-slack AccessToken class.
+        # Wraps OAuth2::Client#get_token to pass in the omniauth-slack AccessToken class.
         def get_token(params, access_token_opts = {}, access_token_class = OmniAuth::Slack::OAuth2::AccessToken) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
           debug{"params #{params}, access_token_opts #{access_token_opts}"}
           rslt = super(params, access_token_opts, access_token_class)
@@ -53,7 +53,12 @@ module OmniAuth
         end
         
         # Logs each API request and stores the API result in History array (if exists).
-        # TODO: There should be some kind of option to disable this.
+        #
+        # Storage can be disabled by setting client_options: {history: false}.
+        # Storage can be enabled by setting client_options: {history: Array.new}.
+        # Storage is enabled by default, but only during OmniAuth OAuth2 cycle.
+        # 
+        # 
         def request(*args)
           logger.debug "(slack) API request '#{args[0..1]}'."  # in thread '#{Thread.current.object_id}'."  # by Client '#{self}'
           debug{"API request args #{args}"}
@@ -70,7 +75,7 @@ module OmniAuth
           request_output
         end
 
-        # Overrides #site to insert custom subdomain for API calls.
+        # Wraps #site to insert custom subdomain for API calls.
         def site(*args)
           if !@subdomain.to_s.empty?
             site_uri = URI.parse(super)
