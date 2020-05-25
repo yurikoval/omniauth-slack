@@ -56,7 +56,7 @@ module OmniAuth
         #
         # Storage can be disabled by setting client_options: {history: false}.
         # Storage can be enabled by setting client_options: {history: Array.new}.
-        # Storage is enabled by default, but only during OmniAuth OAuth2 cycle.
+        # Storage is enabled by default, when client is created from Strategy.
         # 
         # 
         def request(*args)

@@ -90,7 +90,7 @@ module OmniAuth
             pass
             
           elsif app_id && app_id.to_s != api_app_id.to_s
-            logger.info("(slack) VerifySlackSignature API app_id mismatch")
+            logger.info("(slack) VerifySlackSignature app_id mismatch")
             pass
             
           else

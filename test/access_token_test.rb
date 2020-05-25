@@ -2,10 +2,11 @@ require 'helper'
 
 describe OmniAuth::Slack::OAuth2::AccessToken do
   def setup
-    @access_token = OmniAuth::Slack::OAuth2::AccessToken.new(
+    @access_token = OmniAuth::Slack::OAuth2::AccessToken.from_hash(
       OmniAuth::Slack::OAuth2::Client.new('key','secret'),
-      "ABC123DEF456",
       {
+        'ok' => true,
+        'access_token' => 'xoxp-abcdef-123456789',
         'user' => {'id' => '11', 'name' => 'bill'},
         'team_id' => 33,
         'team_name' => 'my team',
@@ -21,6 +22,7 @@ describe OmniAuth::Slack::OAuth2::AccessToken do
   it 'defines getter methods for basic user data' do
     assert_equal 'users:read', @access_token.scope
     assert_equal 33, @access_token.team_id
+    assert_equal 'my team', @access_token.team_name
   end
   
   describe 'user_id' do
@@ -36,6 +38,22 @@ describe OmniAuth::Slack::OAuth2::AccessToken do
     it "gets data from params['authorizing_user'].to_h['user_id']" do
       @access_token.params.replace({'authorizing_user' => {'user_id' => 'user-id-02'}})
       assert_equal 'user-id-02', @access_token.user_id
+    end
+  end
+  
+  describe 'ok?' do
+    it 'returns true or false' do
+      assert_equal true, @access_token.ok?
+      @access_token.params['ok'] = 'false'
+      assert_equal false, @access_token.ok?
+      @access_token.params['ok'] = nil
+      assert_equal false, @access_token.ok?
+    end
+  end
+  
+  describe 'token_type?' do
+    it 'compares token_type with any number of arguments and returns true if any match' do
+      assert_equal true, @access_token.token_type?('user')
     end
   end
   

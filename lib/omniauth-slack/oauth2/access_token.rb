@@ -4,27 +4,23 @@ require 'oauth2/access_token'
 require 'omniauth-slack/refinements'
 require 'omniauth-slack/debug'
 
-# The AccessToken object is built from an access-token-hash, which is returned from the get-token
-# API request or is passed in manually via AccessToken.from_hash(). See OmniAuth::Slack::build_access_token.
+# The AccessToken object is built with the hash returned from the get-token
+# API request or is passed in manually via AccessToken.from_hash().
+# See OmniAuth::Slack::build_access_token.
 #
-# The original access-token hash can always be found at AccessToken#params.
+# The original hash from the API can always be found at AccessToken#params.
 # As a convenience, you can call '[]' on the params hash by sending
 # the method and args directly to the access-token object.
 #
 #     my_token['ok']      --> true
 #     my_token['app_id']  --> A012345678
 #
-# The AccessToken object moves some things around a little bit, for example: The params['access_token']
-# string is moved to the top level of the access-token object under the method 'token'.
+# The AccessToken instance provides getter methods for some of the data points.
+# For example, the actual token string can be accessed at.
 #
 #     my_token.token      --> xoxb-123456789...
-#
-# For workspace-app tokens, you will see a 'scopes' hash in access-token data.
-# You can use the hash if you want, but you can also just call my_token.all_scopes.
-# Tokens that have no inherent 'scopes' hash from Slack, will have it inserted based
-# on the 'scope' string.
 # 
-# See Slack's documentation on the different types of tokens available.
+# See Slack's documentation for the different types of tokens available.
 #
 #     https://api.slack.com/methods/oauth.access
 #     https://api.slack.com/methods/oauth.v2.access
@@ -36,10 +32,10 @@ module OmniAuth
     using OAuth2Refinements
     
     module OAuth2
-      # Enhanced subclass of OAuth2::AccessToken, used by OmniAuth::Slack
-      # whenever an OAuth2::AccessToken is required.
+      # Enhanced subclass of OAuth2::AccessToken handles Slack-specific data and behavior.
       #
-      # Adds class and instance scope-query method +has_scope?+.
+      # Also adds scope-query method +has_scope?+.
+      #
       class AccessToken < ::OAuth2::AccessToken        
         include OmniAuth::Slack::Debug
         
@@ -58,9 +54,25 @@ module OmniAuth
           end
         end
         
-        define_getters %w(team_id team_domain scope)
+        define_getters %w(
+          app_id
+          authorizing_user
+          enterprise
+          installer_user
+          scope
+          team
+          team_id
+          team_name
+          team_domain
+          user
+        )
         
-        
+        def ok?
+          params['ok'] == true ||
+          params['ok'].to_s[/true/i] ||
+          false
+        end
+             
         # Intercept super to return nil instead of empty string.
         def token
           rslt = super
@@ -70,10 +82,17 @@ module OmniAuth
         def token_type
           params['token_type'] ||
           case
-            when params['access_token'].to_s[/xoxp/]; 'user'
-            when params['access_token'].to_s[/xoxb/]; 'bot'
-            when params['access_token'].to_s[/xoxa/]; 'app'
-            when params['access_token'].to_s[/xoxr/]; 'refresh'
+            when 
+              params['token_type'] == 'user' ||
+              @token.to_s[/xoxp/]; 'user'
+            when
+              params['token_type'] == 'bot' ||
+              @token.to_s[/xoxb/]; 'bot'
+            when
+              params['token_type'] == 'app' ||
+              @token.to_s[/xoxa/]; 'app'
+            when
+              @token.to_s[/xoxr/]; 'refresh'
           end
         end
         
@@ -81,7 +100,7 @@ module OmniAuth
           #debug{"'#{_type}'"}
           [_type].flatten.any? do |t|
             token_type.to_s == t.to_s
-          end
+          end || false
         end
         
         # Converts 'authed_user' hash (of Slack v2 oauth flow) to AccessToken object.
@@ -111,6 +130,8 @@ module OmniAuth
             params['user'].to_h['id'] ||
             # workspace-app token with authorizing user.
             params['authorizing_user'].to_h['user_id'] ||
+            # workspace-app token with installer user.
+            params['installer_user'].to_h['user_id'] ||
             # user-id from authed_user hash.
             params['id'] #||
             # v2 api bot token, as a last resort.
@@ -127,9 +148,35 @@ module OmniAuth
           debug { rslt }
           rslt
         end
-
+        
+        def user_name
+          params['user_name'] ||
+          # from sub-token in 'authed_user'
+          params['authed_user'].to_h['name'] ||
+          # workspace-app token with attached user.
+          params['user'].to_h['name'] ||
+          # from authed_user hash.
+          params['name'] ||
+          # workspace token with authorizing user.
+          params['authorizing_user'].to_h['name'] ||
+          # workspace token with installer user.
+          params['installer_user'].to_h['name'] ||
+          # more workspace token possibilities.
+          to_auth_hash.deep_find('nickname') ||
+          to_auth_hash.deep_find('real_name')
+        end
+        
         def bot_user_id
           params['bot_user_id']
+        end
+        
+        def app_user_id
+          params['app_user_id']
+        end
+        
+        # Experimental, converts access_token to auth_hash.
+        def to_auth_hash
+          Module.const_get('::OmniAuth::Slack::AuthHash').new(params)
         end
 
 

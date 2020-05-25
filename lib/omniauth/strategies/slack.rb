@@ -98,8 +98,11 @@ module OmniAuth
       #     end
       #   end
       #
-      info do   
-        access_token.to_hash
+      info do
+        {
+          name: access_token.user_name
+        }
+        .merge access_token.to_hash
       end
 
       # Defines a section for all additional data to be
