@@ -11,11 +11,10 @@ To view current or previous releases:
 
 # OmniAuth Slack, a Ruby Gem
 
-This Gem contains the Slack OAuth2 strategy for OmniAuth and supports most features of
-the [Slack OAuth2 authorization API](https://api.slack.com/docs/oauth), including the
-[Sign in with Slack](https://api.slack.com/docs/sign-in-with-slack) and
-[Add to Slack](https://api.slack.com/docs/slack-button) approval flows,
-in both Slack v1 API and [Slack v2 API](https://api.slack.com/authentication/oauth-v2).
+The omniauth-slack gem contains the Slack OAuth2 strategy for [OmniAuth](https://github.com/omniauth/omniauth) and supports
+the Slack [OAuth2 v2 API](https://api.slack.com/authentication/oauth-v2)
+and the Slack OAuth2 v1 API.
+
 
 This Gem supports Slack v2 API bot and user tokens, as well as v1 API workspace apps and tokens.
 Slack "classic" apps and tokens should also work but are not fully tested.
@@ -23,11 +22,11 @@ Slack "classic" apps and tokens should also work but are not fully tested.
 
 ## Before You Begin
 
-OmniAuth Slack is implemented through OmniAuth modules and methods, so you should familiarize yourself with the basics of [OmniAuth (README)](https://github.com/intridea/omniauth).
+OmniAuth Slack is implemented through the OmniAuth gem, so you should familiarize yourself with the basics of [OmniAuth](https://github.com/intridea/omniauth).
 
 OmniAuth Slack authorizes Slack users on behalf of a defined Slack application. If you don't already have an application defined on Slack, sign into the [Slack application dashboard](https://api.slack.com/applications) and create an application. Take note of your API keys.
 
-While you're in the application settings, add a Redirect URL to your application (under the `OAuth & Permissions` section), something simple like `http://localhost:3000/` or `https://myslackapp.com/`. The URL doesn't have to be accessible to the public internet, but it should be accessible to your development machine.
+While you're in the application settings, add a Redirect URL to your application (under the `OAuth2 & Permissions` section), something simple like `http://localhost:3000/` or `https://myslackapp.com/`. The URL doesn't have to be accessible to the public internet, but it should be accessible to your development machine.
 
 
 ## Using This Strategy
@@ -54,8 +53,7 @@ Rails.application.config.middleware.use OmniAuth::Builder do
 end
 ```
 
-Replace `'API_KEY'` and `'API_SECRET'` with the appropriate values you obtained [earlier](https://api.slack.com/applications).
-Replace `'string-of-scopes'` with a space-separated string of Slack API scopes.
+Replace `'API_KEY'` and `'API_SECRET'` with the relevant values you obtained from the Slack application setup. Replace `'string-of-scopes'` with a space-separated string of Slack API scopes.
 
 
 For a **[Sinatra](http://sinatrarb.com/)** app:     <span name="sinatra-app" id="sinatra-app"></span>
@@ -101,10 +99,9 @@ require 'omniauth-slack'
 ## Scopes
 Slack lets you choose from a number of [scopes](https://api.slack.com/scopes) supporting one or more of the **classic**, **workspace**, and **v2** apps and token types.
 
-**Important:** You cannot request both identity scopes and non-identity scopes in a single authorization request,
-within the same scope field (`scope` or `user_scope`).
+**Important:** You cannot request both identity scopes and non-identity scopes in a single authorization request, within the same scope field (`scope` or `user_scope`).
 
-If you need to combine "Add to Slack" scopes with those used for "Sign in with Slack",
+If you need to combine *Add to Slack* scopes with those used for *Sign in with Slack*,
 you may want to configure two providers:
 
   ```ruby
@@ -114,8 +111,7 @@ you may want to configure two providers:
 
 Use the first provider to sign users in and the second to add the application, and deeper capabilities, to their team.
 
-Sign-in-with-Slack handles quick authorization of users with minimally scoped requests.
-Deeper scope authorizations are acquired with further passes through the Add-to-Slack authorization process.
+The [Sign-in-with-Slack](https://api.slack.com/docs/sign-in-with-slack) approval flow handles quick authorization of users with minimally scoped requests. Deeper scope authorizations are acquired with further passes through the authorization cycle.
 
 This works because Slack scopes are additive: Once you successfully authorize a scope, the token will possess that scope forever, regardless of what flow or scopes are requested at future authorizations (removal of scope requires revocation of the token or uninstallation of the Slack app from the team).
 
@@ -188,7 +184,7 @@ However, if the user is already signed in to that team, specifying the `:team_do
 Sign in behavior with team settings and signed in state can be confusing. Here is a breakdown based on Slack documentation and observations while using omniauth-slack.
 
 
-#### Team settings and sign in state vs Slack OAuth behavior. 
+#### Team settings and sign in state vs Slack OAuth2 behavior. 
 
 | Setting and state | Will authenticate against specific team | Will skip authorization approval<br>-<br>*The elusive unobtrusive<br>[Sign in with Slack](https://api.slack.com/docs/sign-in-with-slack)* |
 | --- | :---: | :---: |
@@ -219,7 +215,6 @@ Sign in behavior with team settings and signed in state can be confusing. Here i
 
 Set a custom redirect URI in your app, where Slack will redirect-to with an authorization code.
 The redirect URI, whether default or custom, MUST match a registered redirect URI in [your app settings on api.slack.com](https://api.slack.com/apps).
-See the [Slack OAuth docs](https://api.slack.com/docs/oauth) for more details on Redirect URI registration and matching rules.
 
 
 ### callback_path
@@ -280,7 +275,7 @@ If set, only a single api request will be made for each authorization. The respo
 ### pass_through_params
 *optional*
 
-Options for `scope`, `team`, `team_domain`, and `redirect_uri` can also be given at runtime via the query string of the omniauth-slack authorization endpoint URL `/auth/slack?team=...`. The `scope`, `team`, and `redirect_uri` query parameters will be passed directly through to Slack in the OAuth GET request:
+Options for `scope`, `team`, `team_domain`, and `redirect_uri` can also be given at runtime via the query string of the omniauth-slack authorization endpoint URL `/auth/slack?team=...`. The `scope`, `team`, and `redirect_uri` query parameters will be passed directly through to Slack in the OAuth2 GET request:
 
 ```ruby
  https://slack.com/oauth/authorize?scope=identity.basic,identity.email&team=team-id&redirect_uri=https://different.subdomain/different/callback/path
@@ -312,7 +307,7 @@ To allow all pass-through options.
 ### client_options
 *optional*
 
-Client options control the behavior of the `Oauth2::Client`, which handles the
+Client options control the behavior of the `OAuth2::Client`, which handles the
 http requests and redirects during the OmniAuth OAuth2 cycle.
 Here is the current default `client_options`.
 
@@ -364,7 +359,7 @@ try something like this in your Gemfile:
   ```
 
 #### The reason behind this
-Tokens returned from the v2 API may not always conform to the OAUTH2 spec,
+Tokens returned from the v2 API may not always conform to the OAuth2 spec,
 and therefore may raise errors in the OAuth2 gem during the callback phase,
 even if the token response from Slack's v2 API is successful from Slack's point of view.
 
@@ -376,7 +371,7 @@ This `raise_errors` option is now the default in the omniauth-slack gem.
 
 ## Access Tokens
 
-While the core OAUTH2 access-token is a simple string, the OAuth2 gem packages it along with other data returned from the `/api/oauth.access` call, as an AccessToken instance. The AccessToken contains everything you need to make Slack API requests: the actual token string, the expiration data (if any), the team, user, scope, and an OAuth2::Client instance with the API key and secret.
+While the core OAuth2 access-token is a simple string, the OAuth2 gem packages it along with other data returned from the `/api/oauth.access` call, as an AccessToken instance. The AccessToken contains everything you need to make Slack API requests: the actual token string, the expiration data (if any), the team, user, scope, and an OAuth2::Client instance with the API key and secret.
 
 The AccessToken generated by omniauth-slack also has additional features, such as `has_scope?(list-of-scopes)`, which queries the token's awarded scopes. This is handy for Slack Workspace apps and their multi-dimensional scopes, but it works for any Slack token type.
 
@@ -538,12 +533,12 @@ So lets run through the cycle again and take a closer look.
        
 
 ## Slack Workspace Apps
-This gem provides support for Slack's (deprecated) [Workspace apps](https://api.slack.com/workspace-apps-preview). There are some important differences between Slack's classic apps and the new Workspace apps. The main points to be aware of when using omniauth-slack with Workspace Apps are:
+This gem provides support for Slack's [Workspace apps](https://api.slack.com/workspace-apps-preview) (now legacy). There are some important differences between Slack's classic apps and the new Workspace apps. The main points to be aware of when using omniauth-slack with Workspace Apps are:
 
   * Workspace app tokens are issued as a single token per team. There are no user or bot tokens. All Workspace app API calls are made with the Workspace token. Calls that act on behalf of a user or bot are made with the same token.
 
-  * The available api calls and the scopes required to access them are different in Workspace apps. See Slack's docs on [Scopes](https://api.slack.com/scopes) and [Methods](https://api.slack.com/methods/workspace-tokens) for more details.
-
+  * The available api calls and the scopes required to access them are different in Workspace apps.
+  
   * The `AuthHash.credentials.scopes` value, returned from a successful authentication, is a hash with each value containing an array of scopes. The usual `scope` key will not have a value.
 
 

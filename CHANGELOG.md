@@ -1,16 +1,16 @@
 ## v2.5.0
 
-* Add Slack v2 API support (oauth flow, scopes, tokens).
+* Added Slack v2 API support (oauth flow, scopes, tokens).
 
-* Remove additional API calls from callback phase.
+* Removed additional API calls from callback phase.
 
-* Remove mapping of specific access-token fields to auth-hash `info` section.
+* Removed mapping of specific access-token fields to auth-hash `info` section.
 
-* Implement deep-trace logging, activated with `ENV['OMNIAUTH_SLACK_DEBUG']=true`
+* Implemented deep-trace logging, activated with `ENV['OMNIAUTH_SLACK_DEBUG']=true`
 
 * Improved `AccessToken#has_scope?` functionality.
 
-* Add optional OmniAuth::Slack::VerifySlackSignature middleware (experimental).
+* Added optional OmniAuth::Slack::VerifySlackSignature middleware (experimental).
 
 * Numerous code improvements and debugging.
 
