@@ -127,9 +127,14 @@ module OmniAuth
       def authorize_params
         super.tap do |prms|
           params_digest = prms.hash
-          debug{"Using authorize_params #{prms}"}
-          prms.merge!(request.params.keep_if{|k,v| pass_through_params.reject{|o| o.to_s == 'team_domain'}.include?(k.to_s)})
-          log(:debug, "Modified authorize_params #{prms}") if prms.hash != params_digest
+          debug{"Using omniauth authorize_params #{prms}"}
+          debug{"Considering request.params #{request.params}"}
+          debug{"Considering pass_through_params #{pass_through_params}"}
+          filtered_ptp = pass_through_params.reject{|o| o.to_s == 'team_domain'}
+          filtered_rp  = request.params.reject{|k,v| !filtered_ptp.any?{|ptp| ptp.to_s == k.to_s}}
+          debug{"Filtered request params #{filtered_rp}"}
+          prms.merge! filtered_rp
+          log(:debug, "Using modified authorize_params #{prms}") if prms.hash != params_digest
           session['omniauth.authorize_params'] = prms
         end
       end
@@ -247,7 +252,7 @@ module OmniAuth
       end
       
       def scopes_requested
-        # omniauth.authorize_params is a custom enhancement to omniauth for omniauth-slack.
+        # omniauth.authorize_params is an enhancement to omniauth functionality for omniauth-slack.
         out = {
           scope: env['omniauth.authorize_params'].to_h['scope'],
           user_scope: env['omniauth.authorize_params'].to_h['user_scope']
