@@ -1,4 +1,5 @@
-⚠   **NOTICE**: You are viewing the README of the **master** branch of the **ginjo** fork of the **omniauth-slack** gem. This document may refer to features not yet released. Conversely ( inversely? ) this branch may contain features  and changes not yet documented.
+⚠   **NOTICE**: You are viewing the README of the **master** branch of the **ginjo** fork of the **omniauth-slack** gem.
+This document may refer to features not yet released. Conversely (inversely?) this branch may contain features  and changes not yet documented.
 
 To view current or previous releases:
 
@@ -33,67 +34,68 @@ While you're in the application settings, add a Redirect URL to your application
 
 First start by adding this gem to your Gemfile:
 
-```ruby
-gem 'ginjo-omniauth-slack', require:'omniauth-slack'
-```
+  ```ruby
+    gem 'ginjo-omniauth-slack', require:'omniauth-slack'
+  ```
 
 Or specify the latest HEAD (development) version from the ginjo repository:
 
-```ruby
-gem 'ginjo-omniauth-slack', require:'omniauth-slack', git: 'https://github.com/ginjo/omniauth-slack'
-```
+  ```ruby
+    gem 'ginjo-omniauth-slack', require:'omniauth-slack', git: 'https://github.com/ginjo/omniauth-slack'
+  ```
 
 Next, tell OmniAuth about this provider.
 
 For a **[Rails](https://rubyonrails.org)** app, your `config/initializers/omniauth.rb` file should look like this:
 
-```ruby
-Rails.application.config.middleware.use OmniAuth::Builder do
-  provider :slack, 'API_KEY', 'API_SECRET', scope: 'string-of-scopes'
-end
-```
+  ```ruby
+    Rails.application.config.middleware.use OmniAuth::Builder do
+      provider :slack, 'API_KEY', 'API_SECRET', scope: 'string-of-scopes'
+    end
+  ```
 
 Replace `'API_KEY'` and `'API_SECRET'` with the relevant values you obtained from the Slack application setup. Replace `'string-of-scopes'` with a space-separated string of Slack API scopes.
 
 
 For a **[Sinatra](http://sinatrarb.com/)** app:     <span name="sinatra-app" id="sinatra-app"></span>
 
-```ruby
-require 'sinatra'
-require 'omniauth-slack'
+  ```ruby
+    require 'sinatra'
+    require 'omniauth-slack'
 
-use OmniAuth::Builder do |env|
-  provider :slack,
-    ENV['SLACK_OAUTH_KEY_WS'],
-    ENV['SLACK_OAUTH_SECRET_WS'],
-    scope: 'string-of-scopes'
-end
-```
+    use OmniAuth::Builder do |env|
+      provider :slack,
+        ENV['SLACK_OAUTH_KEY_WS'],
+        ENV['SLACK_OAUTH_SECRET_WS'],
+        scope: 'string-of-scopes'
+    end
+  ```
 
 
 If you are using **[Devise](https://github.com/plataformatec/devise)** then it will look like this:
 
-```ruby
-Devise.setup do |config|
-  # other stuff...
+  ```ruby
+    Devise.setup do |config|
+      # other stuff...
 
-  config.omniauth :slack, ENV['SLACK_APP_ID'], ENV['SLACK_APP_SECRET'], scope: 'string-of-scopes'
+      config.omniauth :slack, ENV['SLACK_APP_ID'], ENV['SLACK_APP_SECRET'], scope: 'string-of-scopes'
 
-  # other stuff...
-end
-```
+      # other stuff...
+    end
+  ```
 
 
 To manually install and require the gem:
-```bash
-# shell
-gem install ginjo-omniauth-slack
-````
 
-```ruby
-# ruby
-require 'omniauth-slack'
-```
+  ```bash
+    # shell
+    gem install ginjo-omniauth-slack
+  ```
+
+  ```ruby
+    # ruby
+    require 'omniauth-slack'
+  ```
 
 
 ## Scopes
@@ -148,12 +150,12 @@ More information on provider and authentication options can be found in omniauth
 ### scope *and/or* user_scope
 *required*
 
-```ruby
-  :scope => 'string-of-space-separated-scopes'
+  ```ruby
+    :scope => 'string-of-space-separated-scopes'
   
-  # and/or (v2 API only)
-  :user_scope => '...'
-```
+    # and/or (v2 API only)
+    :user_scope => '...'
+  ```
 
 Specify the scopes for the authorization request.
 
@@ -161,11 +163,11 @@ Specify the scopes for the authorization request.
 ### team
 *optional*
 
-```ruby
-  :team => 'team-id'
-    # and/or
-  :team_domain => 'team-subdomain'
-```
+  ```ruby
+    :team => 'team-id'
+      # and/or
+    :team_domain => 'team-subdomain'
+  ```
 
 > If you don't pass a team param, the user will be allowed to choose which team they are authenticating against. Passing this param ensures the user will auth against an account on that particular team.
 
@@ -188,12 +190,12 @@ Sign in behavior with team settings and signed in state can be confusing. Here i
 
 | Setting and state | Will authenticate against specific team | Will skip authorization approval<br>-<br>*The elusive unobtrusive<br>[Sign in with Slack](https://api.slack.com/docs/sign-in-with-slack)* |
 | --- | :---: | :---: |
-| using `:team`, already signed in | :heavy_check_mark: | :heavy_check_mark: |
-| using `:team`, not signed in |   | :heavy_check_mark: |
-| using `:team_domain`, already signed in | :heavy_check_mark: |   |
-| using `:team_domain`, not signed in | :heavy_check_mark: |   |
-| using `:team` and `:team_domain`, already signed in | :heavy_check_mark: | :heavy_check_mark: |
-| using `:team` and `:team_domain`, not signed in |   | :heavy_check_mark: |
+| using `:team`, already signed in | :small_blue_diamond: | :small_blue_diamond: |
+| using `:team`, not signed in |   | :small_blue_diamond: |
+| using `:team_domain`, already signed in | :small_blue_diamond: |   |
+| using `:team_domain`, not signed in | :small_blue_diamond: |   |
+| using `:team` and `:team_domain`, already signed in | :small_blue_diamond: | :small_blue_diamond: |
+| using `:team` and `:team_domain`, not signed in |   | :small_blue_diamond: |
 | using no team parameters |   |   |
 
 *Slack's authorization process will only skip the authorization approval step, if in addition to the above settings and state, ALL of the following conditions are met:*
@@ -207,9 +209,9 @@ Sign in behavior with team settings and signed in state can be confusing. Here i
 ### redirect_uri
 *optional*
 
-```ruby
-  :redirect_uri => 'https://<defaults-to-the-app-origin-host-and-port>/auth/slack/callback'
-```
+  ```ruby
+    :redirect_uri => 'https://<defaults-to-the-app-origin-host-and-port>/auth/slack/callback'
+  ```
 
 *This setting overrides the `:callback_path` setting.*
 
@@ -220,9 +222,9 @@ The redirect URI, whether default or custom, MUST match a registered redirect UR
 ### callback_path
 *optional*
 
-```ruby
-  :callback_path => '/auth/slack/callback'
-```
+  ```ruby
+    :callback_path => '/auth/slack/callback'
+  ```
 
 *This setting is ignored if `:redirect_uri` is set.*
 
@@ -232,9 +234,9 @@ Set a custom callback path (path only, not the full URI) for Slack to redirect-t
 ### skip_info
 *optional*
 
-```ruby
-  :skip_info => false
-```
+  ```ruby
+    :skip_info => false
+  ```
 
 Skip building the `InfoHash` section of the `AuthHash` object.
 
@@ -277,9 +279,9 @@ If set, only a single api request will be made for each authorization. The respo
 
 Options for `scope`, `team`, `team_domain`, and `redirect_uri` can also be given at runtime via the query string of the omniauth-slack authorization endpoint URL `/auth/slack?team=...`. The `scope`, `team`, and `redirect_uri` query parameters will be passed directly through to Slack in the OAuth2 GET request:
 
-```ruby
- https://slack.com/oauth/authorize?scope=identity.basic,identity.email&team=team-id&redirect_uri=https://different.subdomain/different/callback/path
-```
+  ```ruby
+   https://slack.com/oauth/authorize?scope=identity.basic,identity.email&team=team-id&redirect_uri=https://different.subdomain/different/callback/path
+  ```
 
 The `team_domain` query parameter will be inserted into the authorization GET request
 as a subdomain `https://team-domain.slack.com/oauth/authorize`.
@@ -288,15 +290,15 @@ as a subdomain `https://team-domain.slack.com/oauth/authorize`.
 
 To block all pass-through options.
 
-```ruby
-  provider :slack, KEY, SECRET, pass_through_params:nil
-```
+  ```ruby
+    provider :slack, KEY, SECRET, pass_through_params:nil
+  ```
     
 To allow all pass-through options.
 
-```ruby
-  provider :slack, KEY, SECRET, pass_through_params: %w(team scope redirect_uri team_domain)
-```
+  ```ruby
+    provider :slack, KEY, SECRET, pass_through_params: %w(team scope redirect_uri team_domain)
+  ```
 
 
 ### history
@@ -312,14 +314,14 @@ http requests and redirects during the OmniAuth OAuth2 cycle.
 Here is the current default `client_options`.
 
   ```ruby
-   option :client_options, {
-     site: 'https://slack.com',
-     authorize_url: '/oauth/v2/authorize',
-     token_url: '/api/oauth.v2.access',
-     auth_scheme: :basic_auth,
-     raise_errors: false, # MUST be false to allow Slack's get-token response from v2 API.
-     history: Array.new,
-   }
+    option :client_options, {
+      site: 'https://slack.com',
+      authorize_url: '/oauth/v2/authorize',
+      token_url: '/api/oauth.v2.access',
+      auth_scheme: :basic_auth,
+      raise_errors: false, # MUST be false to allow Slack's get-token response from v2 API.
+      history: Array.new,
+    }
   ```
 
 Generally, you can leave this option alone, but there is one case where you need it:
@@ -575,7 +577,7 @@ Create a Sinatra project directory, then add these files.
         access_token: env['omniauth.strategy'].access_token
       }.to_yaml
     end
-```
+  ```
 #### Gemfile
 
   ```ruby

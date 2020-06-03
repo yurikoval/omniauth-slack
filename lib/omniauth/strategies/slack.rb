@@ -1,3 +1,5 @@
+# :markup: tomdoc
+
 require 'omniauth/strategies/oauth2'
 require 'omniauth-slack/refinements'
 require 'omniauth-slack/slack'
@@ -9,19 +11,28 @@ module OmniAuth
   using Slack::OAuth2Refinements
   
   module Strategies
+  
+    # This is the OmniAuth strategy for Slack.
+    # It is used as Rack middleware.
+    #
+    #     use OmniAuth::Builder do
+    #       provider :slack, OAUTH_KEY, OAUTH_SECRET, options...
+    #     end
+    #
     class Slack < OmniAuth::Strategies::OAuth2
       include OmniAuth::Slack::Debug 
       
       
       ###  Options  ###
-    
-      debug{"#{self} setting up default options"}
-      
+
       # Master list of authorization options handled by omniauth-slack.
       # See below for redirect_uri.
+      # 
       AUTH_OPTIONS = %i(scope user_scope team team_domain)
       
-      # Default strategy name.
+      debug{"#{self} setting up default options"}
+      
+      # Default strategy name
       option :name, 'slack'
       
       # Options that can be passed with provider authorization URL.
@@ -78,7 +89,8 @@ module OmniAuth
       end
 
       # Gathers a myriad of possible data returned from omniauth-slack /api/oauth.access call,
-      # for :info section of AuthHash.
+      # for `:info` section of AuthHash.
+      # :markup: markdown
       #
       # You an modify the info hash from your application.
       # This example adds a users_info API request and response.
@@ -160,7 +172,7 @@ module OmniAuth
         OmniAuth::Slack::AuthHash.new super.to_hash
       end
       
-      # Uses OmniAuth::Slack::OAuth2::Client to handle Slack-specific features.
+      # Uses `OmniAuth::Slack::OAuth2::Client` to handle Slack-specific features.
       #
       # * Logs API requests with OmniAuth.logger.
       # * Allows passthrough of Slack team_domain.

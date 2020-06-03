@@ -1,3 +1,6 @@
+# This is a yaml file of rdoc options
+#
+#
 --- !ruby/object:RDoc::Options
 encoding: UTF-8
 static_path: []
@@ -14,6 +17,7 @@ locale_dir: locale
 locale_name: 
 main_page: 
 #markup: rdoc
+markup: markdown
 output_decoration: true
 page_dir: 
 show_hash: false

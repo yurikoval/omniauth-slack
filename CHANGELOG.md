@@ -10,7 +10,7 @@
 
 * Improved `AccessToken#has_scope?` functionality.
 
-* Added optional OmniAuth::Slack::VerifySlackSignature middleware (experimental).
+* Added optional `OmniAuth::Slack::VerifySlackSignature` middleware (experimental).
 
 * Numerous code improvements and debugging.
 
