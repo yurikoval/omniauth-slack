@@ -1,6 +1,8 @@
 require 'hashie'
 require 'omniauth/strategies/oauth2'
 require 'omniauth/auth_hash'
+require 'oauth2'
+require 'omniauth-slack/omniauth/auth_hash'
 
 
 # Refinements will work as long as the call to the refined method is lexically scoped with the 'using'.
@@ -9,10 +11,10 @@ module OmniAuth
   module Slack
         
     module OAuth2Refinements
-      refine OAuth2::Response do
-        # TODO: This might not be used any more.
+      refine ::OAuth2::Response do
         def to_auth_hash
-          Module.const_get('::OmniAuth::Slack::AuthHash').new(parsed)
+          #Module.const_get('::OmniAuth::Slack::AuthHash').new(parsed)
+          ::OmniAuth::Slack::AuthHash.new(parsed)
         end
       end
     end

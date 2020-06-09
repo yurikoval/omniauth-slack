@@ -40,7 +40,9 @@ module OmniAuth
           debug{"args: #{args}"}
           super
           self.logger = OmniAuth.logger
-          self.history ||= (options[:history] || HISTORY_DEFAULT).dup
+          self.history ||= (options[:history] || HISTORY_DEFAULT)
+          # Moved 'dup' to it's own line, cuz we can't dup nil in older ruby version.
+          self.history && self.history = self.history.dup
           self.subdomain ||= options[:subdomain] || SUBDOMAIN_DEFAULT
         end
                 
