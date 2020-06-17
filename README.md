@@ -16,9 +16,10 @@ The omniauth-slack gem contains the Slack OAuth2 strategy for [OmniAuth](https:/
 the Slack [OAuth2 v2 API](https://api.slack.com/authentication/oauth-v2)
 and the Slack OAuth2 v1 API.
 
-
 This Gem supports Slack v2 API bot and user tokens, as well as v1 API workspace apps and tokens.
 Slack "classic" apps and tokens should also work but are not fully tested.
+
+Omniauth-slack does not enforce a Ruby version constraint. The Gem will work with Ruby versions 2.3 through 2.6.x. Older versions of Ruby may work but are not tested. Ruby version 2.7.x may work but is not yet tested.
 
 
 ## Before You Begin
@@ -72,7 +73,7 @@ For a **[Sinatra](http://sinatrarb.com/)** app:     <span name="sinatra-app" id=
   ```
 
 
-If you are using **[Devise](https://github.com/plataformatec/devise)** then it will look like this:
+If you are using **[Devise](https://github.com/plataformatec/devise)** then it *should* look like this:
 
   ```ruby
     Devise.setup do |config|
@@ -147,7 +148,7 @@ Some of these options can also be given at runtime in the authorization request 
 More information on provider and authentication options can be found in omniauth-slack's supporting gems [omniauth](https://github.com/omniauth/omniauth), [oauth2](https://github.com/oauth-xx/oauth2), and [omniauth-oauth2](https://github.com/omniauth/omniauth-oauth2).
 
 
-### scope *and/or* user_scope
+### :scope *and/or* :user_scope => space-delimited-string-of-scopes
 *required*
 
   ```ruby
@@ -160,14 +161,21 @@ More information on provider and authentication options can be found in omniauth
 Specify the scopes for the authorization request.
 
 
-### team
+### team: string
+*optional*
+
+### team_domain: string
 *optional*
 
   ```ruby
-    :team => 'team-id'
-      # and/or
-    :team_domain => 'team-subdomain'
+    :team => 'team-id',
+    
+    # and/or
+    
+    :team_domain => 'my_team_domain'
   ```
+Requests authentication against a specific team.
+
 
 > If you don't pass a team param, the user will be allowed to choose which team they are authenticating against. Passing this param ensures the user will auth against an account on that particular team.
 
@@ -206,8 +214,8 @@ Sign in behavior with team settings and signed in state can be confusing. Here i
 * Current authorization is not requesting any non-identity scopes (but it's ok if the token already has non-identity scopes).
 
 
-### redirect_uri
-*optional*
+### redirect_uri: string
+String *optional*
 
   ```ruby
     :redirect_uri => 'https://<defaults-to-the-app-origin-host-and-port>/auth/slack/callback'
@@ -219,7 +227,7 @@ Set a custom redirect URI in your app, where Slack will redirect-to with an auth
 The redirect URI, whether default or custom, MUST match a registered redirect URI in [your app settings on api.slack.com](https://api.slack.com/apps).
 
 
-### callback_path
+### callback_path: string
 *optional*
 
   ```ruby
@@ -231,7 +239,7 @@ The redirect URI, whether default or custom, MUST match a registered redirect UR
 Set a custom callback path (path only, not the full URI) for Slack to redirect-to with an authorization code. This will be appended to the default redirect URI only. If you wish to specify a custom redirect URI with a custom callback path, just include both in the `:redirect_uri` setting.
 
 
-### skip_info
+### skip_info: boolean
 *optional*
 
   ```ruby
@@ -242,39 +250,8 @@ Skip building the `InfoHash` section of the `AuthHash` object.
 
 If set, only a single api request will be made for each authorization. The response of that authorization request may or may not contain user and email data.
 
-<!--
-    ### Preload Data with Threads
-    *optional*
 
-    ```ruby
-      :preload_data_with_threads => 0
-    ```
-    *This option is ignored if `:skip_info => true` is set.*
-
-    With passed integer > 0, omniauth-slack preloads the basic identity-and-info API call responses, from Slack, using *<#integer>* pooled threads.
-
-    The default `0` skips this feature and only loads those API calls if required, scoped, and authorized, to build the AuthHash.
-
-    ```ruby
-      provider :slack, key, secret, :preload_data_with_threads => 2
-    ```
-
-    More threads can potentially give a quicker callback phase.
-    The caveat is an increase in concurrent request load on Slack, possibly affecting rate limits.
-
-    A second parameter to this option is an array of API methods to call.
-    The possible methods are as listed above under the `:dependencies` section.
-    The default, if the integer > 0, is to preload all of the API methods (scope dependent, of course).
-
-    ```ruby
-      :preload_data_with_threads => [5, %w(api_users_info api_users_profile api_users_identity)]
-    ```
-
-    Use this list in cooperation with the `:dependencies` option to fine-tune your `info` section, `extra` section,
-    and post-authorization API call behavior and order.
--->
-
-### pass_through_params
+### pass_through_params: array-of-strings
 *optional*
 
 Options for `scope`, `team`, `team_domain`, and `redirect_uri` can also be given at runtime via the query string of the omniauth-slack authorization endpoint URL `/auth/slack?team=...`. The `scope`, `team`, and `redirect_uri` query parameters will be passed directly through to Slack in the OAuth2 GET request:
@@ -299,14 +276,9 @@ To allow all pass-through options.
   ```ruby
     provider :slack, KEY, SECRET, pass_through_params: %w(team scope redirect_uri team_domain)
   ```
+  
 
-
-### history
-*optional*
-.....
-
-
-### client_options
+### client_options: hash-of-client-options
 *optional*
 
 Client options control the behavior of the `OAuth2::Client`, which handles the
@@ -407,11 +379,11 @@ To extract data from the API response, call `parsed` on the response object.
 
 
 ## The Auth Hash
-<!-- *TODO: Give a quick bit about what an auth_hash object is.* -->
 
-Each Successful OmniAuth authorization places an [AuthHash](https://github.com/omniauth/omniauth/wiki/Auth-Hash-Schema) object in the environment `env['omniauth.auth']`.
-The AuthHash is just an enhanced hash object containing data from the [OAuth2](https://github.com/oauth-xx/oauth2) response received from
-the get-token API call made during the OmniAuth callback phase.
+Each Successful OmniAuth authorization places an
+[AuthHash](https://github.com/omniauth/omniauth/wiki/Auth-Hash-Schema) object in the environment `env['omniauth.auth']`.
+The AuthHash is just an enhanced hash object containing data from the[OAuth2](https://github.com/oauth-xx/oauth2)
+response received from the get-token API call made during the OmniAuth callback phase.
 See OmniAuth's documentation for the AuthHash schema definition.
 
 With the growing number of multi-dimensional data structures for the various token response objects,
@@ -424,8 +396,8 @@ but it will no longer be mapping specific data points from the access-token
 to specific fields in the AuthHash `info` section (other than `info` fields that are 'required'
 by the OmniAuth::AuthHash schema spec).
 
-Application developers are welcome to define their own `info` section
-directly within the omniauth-slack strategy.
+Application developers are welcome to define their own **`info`** section directly within the omniauth-slack strategy.
+And the same customization can be done for any of the top-level AuthHash sections.
 
   ```ruby
     class OmniAuth::Strategies::Slack
@@ -440,7 +412,7 @@ directly within the omniauth-slack strategy.
   ```
   
 If you want to build your own `info` section *and* have it appended to omniauth-slack's default
-`info` section, then subclass the strategy and use that subclass as your provider.
+`info` section, then subclass the strategy and use that subclass as your `OmniAuth` provider.
 
   ```ruby
     class MyCustomStrategy < OmniAuth::Strategies::Slack
@@ -453,15 +425,17 @@ If you want to build your own `info` section *and* have it appended to omniauth-
       end
     end
     
-    provider MyCustomStrategy, SLACK_OAUTH_KEY, SLACK_OAUTH_SECRET, scope: ...
+    # ...
+    
+    use OmniAuth::Builder do
+      provider MyCustomStrategy, SLACK_OAUTH_KEY, SLACK_OAUTH_SECRET, scope: ...
+    end
   ```
-  
-The same customization can be done for any of the top-level AuthHash sections.
 
-The `credentials` section of the AuthHash will contain the access-token string, the awarded
+The **`credentials`** section of the AuthHash will contain the access-token string, the awarded
 scopes, and any other essential authentication information returned in the OAuth2 response.
 
-The `extra` section contains two hash keys:
+The **`extra`** section contains two hash keys:
 * `:scopes_requested` hash, which are the scopes requested during the current authorization.
 * `:raw_info` hash, which contains the raw response object from any API calls made during the callback phase.
 
@@ -639,23 +613,32 @@ Don't forget to fill in your Slack API credentials. Then start up Rails, and poi
 When a successful authorization cycle completes, your browser should end up with a yaml representation of the auth_hash and access_token objects. What happens next is entirely up to your application.
 
 
-## Advanced
+## Advanced / Experimental
 
-* Customize AuthHash with additional API calls during the callback phase.
+* Deep debug with `ENV['OMNIAUTH_SLACK_DEBUG']=true`.
+  Will output a LOT of detailed TRACE log items.
+  Only use this for debugging during development.
 
-* Deep debug with `ENV['OMNIAUTH_SLACK_DEBUG']=true`
-
-* Optional OmniAuth::Slack::VerifySlackSignature middleware handles signature
-  verification for incoming Slack requests (experimental).
+* An optional `OmniAuth::Slack::VerifySlackSignature` middleware class handles signature
+  verification for incoming Slack requests. This is helpful if you receive Slack
+  events in your application.
   
   ```ruby
+    # In your rack middleware setup file.
+  
     use OmniAuth::Slack::VerifySlackSignature do |config|
       config.app_id          = ENV['SLACK_APP_ID']
       config.signing_secret  = ENV['SLACK_SIGNING_SECRET']
     end
     
-    # When legitimate incoming Slack request comes into your app.
-    #  => env['omniauth.slack.verification'] == true
+    # When legitimate incoming Slack request is received by your app:
+    env['omniauth.slack.verification'] == true
+
+    # When illegitimate incoming Slack request is received by your app:
+    env['omniauth.slack.verification'] == false
+    
+    # When any other request is received by your app:
+    env['omniauth.slack.verification'] == nil
     
   ```
 
