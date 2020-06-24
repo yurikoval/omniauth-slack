@@ -5,6 +5,7 @@ To view current or previous releases:
 
 | Version | Release Date | README |
 | --- | --- | --- |
+| v2.5.0 (ginjo) | 2020-06-17 | https://github.com/ginjo/omniauth-slack/blob/v2.5.0/README.md |
 | v2.4.1 (ginjo) | 2018-09-18 | https://github.com/ginjo/omniauth-slack/blob/v2.4.1/README.md |
 | v2.4.0 (ginjo) | 2018-08-28 | https://github.com/ginjo/omniauth-slack/blob/v2.4.0/README.md |
 | v2.3.0 ([kmrshntr](https://github.com/kmrshntr)) | 2016-01-06 | https://github.com/kmrshntr/omniauth-slack/blob/master/README.md |
