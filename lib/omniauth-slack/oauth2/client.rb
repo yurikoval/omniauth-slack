@@ -44,16 +44,9 @@ module OmniAuth
           # Moved 'dup' to it's own line, cuz we can't dup nil in older ruby version.
           self.history && self.history = self.history.dup
           self.subdomain ||= options[:subdomain] || SUBDOMAIN_DEFAULT
+          self.options[:access_token_class] = OmniAuth::Slack::OAuth2::AccessToken
         end
-                
-        # Wraps OAuth2::Client#get_token to pass in the omniauth-slack AccessToken class.
-        def get_token(params, access_token_opts = {}, access_token_class = OmniAuth::Slack::OAuth2::AccessToken) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-          debug{"params #{params}, access_token_opts #{access_token_opts}"}
-          rslt = super(params, access_token_opts, access_token_class)
-          debug{"Client #{self} built AccessToken #{rslt}"}
-          rslt
-        end
-        
+
         # Logs each API request and stores the API result in History array (if exists).
         #
         # Storage can be disabled by setting client_options: {history: false}.
